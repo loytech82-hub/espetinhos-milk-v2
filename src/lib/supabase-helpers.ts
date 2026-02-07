@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { Comanda, ComandaItem, Produto, CaixaMovimento, Mesa, Cliente } from './types'
+import type { Comanda, ComandaItem, Produto, CaixaMovimento, Mesa, Cliente, CaixaTurno, EstoqueMovimento, Empresa } from './types'
 
 // ============================================
 // COMANDAS
@@ -82,10 +82,22 @@ export async function addItemToComanda(
   if (error) throw new Error(`Erro ao adicionar item: ${error.message}`)
 
   // Decrementar estoque
+  const novoEstoque = produto.estoque - quantidade
   await supabase
     .from('produtos')
-    .update({ estoque: produto.estoque - quantidade })
+    .update({ estoque: novoEstoque })
     .eq('id', produtoId)
+
+  // Registrar movimentacao de estoque
+  await registrarMovimentoEstoque({
+    produto_id: produtoId,
+    tipo: 'venda',
+    quantidade,
+    estoque_anterior: produto.estoque,
+    estoque_posterior: novoEstoque,
+    motivo: `Comanda #${comandaId}`,
+    comanda_id: comandaId,
+  })
 
   // Recalcular total da comanda
   await recalcularTotalComanda(comandaId)
@@ -113,10 +125,22 @@ export async function removeItemFromComanda(
 
   // Restaurar estoque
   if (item.produto) {
+    const novoEstoque = item.produto.estoque + item.quantidade
     await supabase
       .from('produtos')
-      .update({ estoque: item.produto.estoque + item.quantidade })
+      .update({ estoque: novoEstoque })
       .eq('id', item.produto_id)
+
+    // Registrar movimentacao de estoque
+    await registrarMovimentoEstoque({
+      produto_id: item.produto_id,
+      tipo: 'cancelamento',
+      quantidade: item.quantidade,
+      estoque_anterior: item.produto.estoque,
+      estoque_posterior: novoEstoque,
+      motivo: `Item removido da comanda #${comandaId}`,
+      comanda_id: comandaId,
+    })
   }
 
   // Recalcular total
@@ -162,6 +186,9 @@ export async function closeComanda(
 
   if (error) throw new Error(`Erro ao fechar comanda: ${error.message}`)
 
+  // Buscar turno aberto para vincular
+  const turnoAberto = await getTurnoAberto()
+
   // Registrar entrada no caixa
   await supabase.from('caixa').insert({
     tipo: 'entrada',
@@ -169,6 +196,7 @@ export async function closeComanda(
     descricao: `Comanda #${comanda.numero} (${comanda.tipo})`,
     forma_pagamento: formaPagamento,
     comanda_id: comandaId,
+    turno_id: turnoAberto?.id || null,
   })
 
   // Liberar mesa se for comanda de mesa
@@ -189,10 +217,21 @@ export async function cancelComanda(comandaId: number): Promise<void> {
   if (itens) {
     for (const item of itens) {
       if (item.produto) {
+        const novoEstoque = item.produto.estoque + item.quantidade
         await supabase
           .from('produtos')
-          .update({ estoque: item.produto.estoque + item.quantidade })
+          .update({ estoque: novoEstoque })
           .eq('id', item.produto_id)
+
+        await registrarMovimentoEstoque({
+          produto_id: item.produto_id,
+          tipo: 'cancelamento',
+          quantidade: item.quantidade,
+          estoque_anterior: item.produto.estoque,
+          estoque_posterior: novoEstoque,
+          motivo: `Comanda #${comandaId} cancelada`,
+          comanda_id: comandaId,
+        })
       }
     }
   }
@@ -285,9 +324,15 @@ export async function createCaixaMovimento(movimento: {
   descricao: string
   forma_pagamento?: string
 }): Promise<CaixaMovimento> {
+  // Vincular ao turno aberto automaticamente
+  const turno = await getTurnoAberto()
+
   const { data, error } = await supabase
     .from('caixa')
-    .insert(movimento)
+    .insert({
+      ...movimento,
+      turno_id: turno?.id || null,
+    })
     .select()
     .single()
 
@@ -318,4 +363,280 @@ export async function updateMesaStatus(id: number, status: Mesa['status']): Prom
 export async function deleteMesa(id: number): Promise<void> {
   const { error } = await supabase.from('mesas').delete().eq('id', id)
   if (error) throw new Error(`Erro ao deletar mesa: ${error.message}`)
+}
+
+// ============================================
+// TURNOS DO CAIXA
+// ============================================
+
+// Buscar turno aberto
+export async function getTurnoAberto(): Promise<CaixaTurno | null> {
+  const { data } = await supabase
+    .from('caixa_turnos')
+    .select('*')
+    .eq('status', 'aberto')
+    .order('aberto_em', { ascending: false })
+    .limit(1)
+    .single()
+
+  return data as CaixaTurno | null
+}
+
+// Abrir turno do caixa
+export async function abrirTurno(
+  valorAbertura: number,
+  observacao?: string
+): Promise<CaixaTurno> {
+  // Verificar se ja existe turno aberto
+  const turnoExistente = await getTurnoAberto()
+  if (turnoExistente) throw new Error('Ja existe um turno aberto. Feche-o antes de abrir outro.')
+
+  const { data, error } = await supabase
+    .from('caixa_turnos')
+    .insert({
+      valor_abertura: valorAbertura,
+      observacao_abertura: observacao || null,
+      status: 'aberto',
+    })
+    .select()
+    .single()
+
+  if (error) throw new Error(`Erro ao abrir turno: ${error.message}`)
+  return data as CaixaTurno
+}
+
+// Fechar turno do caixa
+export async function fecharTurno(
+  turnoId: number,
+  valorFechamento: number,
+  observacao?: string
+): Promise<void> {
+  // Calcular totais do turno
+  const { data: movimentos } = await supabase
+    .from('caixa')
+    .select('tipo, valor')
+    .eq('turno_id', turnoId)
+
+  let totalEntradas = 0
+  let totalSaidas = 0
+  if (movimentos) {
+    for (const m of movimentos) {
+      if (m.tipo === 'entrada') totalEntradas += m.valor
+      else totalSaidas += m.valor
+    }
+  }
+
+  // Calcular vendas do turno
+  const { data: turno } = await supabase
+    .from('caixa_turnos')
+    .select('*')
+    .eq('id', turnoId)
+    .single()
+
+  const { error } = await supabase
+    .from('caixa_turnos')
+    .update({
+      status: 'fechado',
+      valor_fechamento: valorFechamento,
+      total_entradas: totalEntradas,
+      total_saidas: totalSaidas,
+      total_vendas: totalEntradas,
+      observacao_fechamento: observacao || null,
+      fechado_em: new Date().toISOString(),
+    })
+    .eq('id', turnoId)
+
+  if (error) throw new Error(`Erro ao fechar turno: ${error.message}`)
+}
+
+// ============================================
+// ESTOQUE - MOVIMENTACOES
+// ============================================
+
+// Registrar movimentacao de estoque
+export async function registrarMovimentoEstoque(params: {
+  produto_id: number
+  tipo: 'entrada' | 'saida' | 'ajuste' | 'venda' | 'cancelamento'
+  quantidade: number
+  estoque_anterior: number
+  estoque_posterior: number
+  motivo?: string
+  comanda_id?: number
+}): Promise<void> {
+  await supabase.from('estoque_movimentos').insert({
+    produto_id: params.produto_id,
+    tipo: params.tipo,
+    quantidade: params.quantidade,
+    estoque_anterior: params.estoque_anterior,
+    estoque_posterior: params.estoque_posterior,
+    motivo: params.motivo || null,
+    comanda_id: params.comanda_id || null,
+  })
+}
+
+// Entrada de estoque (compra de mercadoria)
+export async function entradaEstoque(
+  produtoId: number,
+  quantidade: number,
+  motivo?: string
+): Promise<void> {
+  // Buscar estoque atual
+  const { data: produto } = await supabase
+    .from('produtos')
+    .select('estoque')
+    .eq('id', produtoId)
+    .single()
+
+  if (!produto) throw new Error('Produto nao encontrado')
+
+  const novoEstoque = produto.estoque + quantidade
+
+  // Atualizar estoque
+  await supabase
+    .from('produtos')
+    .update({ estoque: novoEstoque })
+    .eq('id', produtoId)
+
+  // Registrar movimentacao
+  await registrarMovimentoEstoque({
+    produto_id: produtoId,
+    tipo: 'entrada',
+    quantidade,
+    estoque_anterior: produto.estoque,
+    estoque_posterior: novoEstoque,
+    motivo: motivo || 'Entrada de mercadoria',
+  })
+}
+
+// Ajuste manual de estoque
+export async function ajusteEstoque(
+  produtoId: number,
+  novaQuantidade: number,
+  motivo: string
+): Promise<void> {
+  // Buscar estoque atual
+  const { data: produto } = await supabase
+    .from('produtos')
+    .select('estoque')
+    .eq('id', produtoId)
+    .single()
+
+  if (!produto) throw new Error('Produto nao encontrado')
+
+  const diferenca = Math.abs(novaQuantidade - produto.estoque)
+
+  // Atualizar estoque
+  await supabase
+    .from('produtos')
+    .update({ estoque: novaQuantidade })
+    .eq('id', produtoId)
+
+  // Registrar movimentacao
+  await registrarMovimentoEstoque({
+    produto_id: produtoId,
+    tipo: 'ajuste',
+    quantidade: diferenca,
+    estoque_anterior: produto.estoque,
+    estoque_posterior: novaQuantidade,
+    motivo,
+  })
+}
+
+// Buscar movimentacoes de estoque
+export async function getMovimentosEstoque(filtros?: {
+  produto_id?: number
+  tipo?: string
+  data_inicio?: string
+  data_fim?: string
+}): Promise<EstoqueMovimento[]> {
+  let query = supabase
+    .from('estoque_movimentos')
+    .select('*, produto:produtos(id, nome, categoria)')
+    .order('created_at', { ascending: false })
+
+  if (filtros?.produto_id) {
+    query = query.eq('produto_id', filtros.produto_id)
+  }
+  if (filtros?.tipo) {
+    query = query.eq('tipo', filtros.tipo)
+  }
+  if (filtros?.data_inicio) {
+    query = query.gte('created_at', filtros.data_inicio)
+  }
+  if (filtros?.data_fim) {
+    query = query.lte('created_at', filtros.data_fim)
+  }
+
+  const { data } = await query.limit(200)
+  return (data || []) as EstoqueMovimento[]
+}
+
+// Buscar produtos com estoque baixo
+export async function getProdutosEstoqueBaixo(): Promise<Produto[]> {
+  const { data } = await supabase
+    .from('produtos')
+    .select('*')
+    .eq('ativo', true)
+    .filter('estoque', 'lte', 'estoque_minimo' as never)
+
+  // Filtrar no cliente (Supabase nao suporta comparar 2 colunas diretamente)
+  if (!data) return []
+  return data.filter(p => p.estoque <= p.estoque_minimo) as Produto[]
+}
+
+// ============================================
+// UPLOAD DE IMAGENS
+// ============================================
+
+// Upload de imagem para Supabase Storage
+export async function uploadImage(bucket: string, file: File): Promise<string> {
+  const ext = file.name.split('.').pop() || 'jpg'
+  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+
+  const { error } = await supabase.storage
+    .from(bucket)
+    .upload(fileName, file, { cacheControl: '3600', upsert: false })
+
+  if (error) throw new Error(`Erro ao enviar imagem: ${error.message}`)
+
+  const { data } = supabase.storage.from(bucket).getPublicUrl(fileName)
+  return data.publicUrl
+}
+
+// Remover imagem do Supabase Storage
+export async function deleteImage(bucket: string, url: string): Promise<void> {
+  // Extrair nome do arquivo da URL publica
+  const parts = url.split('/')
+  const fileName = parts[parts.length - 1]
+  if (!fileName) return
+
+  await supabase.storage.from(bucket).remove([fileName])
+}
+
+// ============================================
+// EMPRESA
+// ============================================
+
+// Buscar dados da empresa
+export async function getEmpresa(): Promise<Empresa | null> {
+  const { data } = await supabase
+    .from('empresa')
+    .select('*')
+    .eq('id', 1)
+    .single()
+
+  return data as Empresa | null
+}
+
+// Atualizar dados da empresa
+export async function updateEmpresa(updates: Partial<Empresa>): Promise<Empresa> {
+  const { data, error } = await supabase
+    .from('empresa')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', 1)
+    .select()
+    .single()
+
+  if (error) throw new Error(`Erro ao salvar dados da empresa: ${error.message}`)
+  return data as Empresa
 }

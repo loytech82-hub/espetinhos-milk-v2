@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { createProduto, updateProduto } from '@/lib/supabase-helpers'
 import { useToast } from '@/lib/toast-context'
+import { ImageUpload } from '@/components/ui/image-upload'
 import type { Produto } from '@/lib/types'
 
 interface ProdutoModalProps {
@@ -35,6 +36,7 @@ export function ProdutoModal({ open, onOpenChange, produto, onSaved }: ProdutoMo
   const [categoria, setCategoria] = useState('espetinhos')
   const [estoque, setEstoque] = useState('')
   const [estoqueMinimo, setEstoqueMinimo] = useState('5')
+  const [imagemUrl, setImagemUrl] = useState<string | null>(null)
 
   // Preencher com dados do produto ao editar
   useEffect(() => {
@@ -44,12 +46,14 @@ export function ProdutoModal({ open, onOpenChange, produto, onSaved }: ProdutoMo
       setCategoria(produto.categoria)
       setEstoque(String(produto.estoque))
       setEstoqueMinimo(String(produto.estoque_minimo))
+      setImagemUrl(produto.imagem_url || null)
     } else {
       setNome('')
       setPreco('')
       setCategoria('espetinhos')
       setEstoque('')
       setEstoqueMinimo('5')
+      setImagemUrl(null)
     }
   }, [produto, open])
 
@@ -68,6 +72,7 @@ export function ProdutoModal({ open, onOpenChange, produto, onSaved }: ProdutoMo
         categoria,
         estoque: parseInt(estoque),
         estoque_minimo: parseInt(estoqueMinimo) || 5,
+        imagem_url: imagemUrl,
         ativo: true,
       }
 
@@ -95,6 +100,16 @@ export function ProdutoModal({ open, onOpenChange, produto, onSaved }: ProdutoMo
       description={isEdit ? 'Atualize as informacoes do produto' : 'Preencha os dados do novo produto'}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Foto do produto */}
+        <div className="flex justify-center">
+          <ImageUpload
+            value={imagemUrl}
+            onChange={setImagemUrl}
+            bucket="produtos"
+            size={100}
+          />
+        </div>
+
         <Input
           label="Nome do Produto"
           value={nome}

@@ -2,19 +2,25 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, ArrowUpCircle, ClipboardList, Wallet } from 'lucide-react'
+import { Plus, ArrowUpCircle, ClipboardList, Wallet, AlertTriangle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, getGreeting } from '@/lib/utils'
+import { getProdutosEstoqueBaixo } from '@/lib/supabase-helpers'
+import { ChartBar } from '@/components/ui/chart-bar'
 import { NovaComandaModal } from '@/components/comandas/nova-comanda-modal'
-import type { Mesa, Comanda } from '@/lib/types'
+import { useAuth } from '@/lib/auth-context'
+import type { Mesa, Comanda, Produto } from '@/lib/types'
 
 export default function DashboardPage() {
   const router = useRouter()
+  const { profile } = useAuth()
   const [mesas, setMesas] = useState<Mesa[]>([])
   const [comandas, setComandas] = useState<Comanda[]>([])
   const [vendasHoje, setVendasHoje] = useState(0)
   const [comandasAbertas, setComandasAbertas] = useState(0)
   const [saldoCaixa, setSaldoCaixa] = useState(0)
+  const [produtosBaixo, setProdutosBaixo] = useState<Produto[]>([])
+  const [vendasSemana, setVendasSemana] = useState<{ label: string; value: number }[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [mesaSelecionada, setMesaSelecionada] = useState<number | null>(null)
@@ -70,6 +76,32 @@ export default function DashboardPage() {
         }, 0)
         setSaldoCaixa(saldo)
       }
+
+      // Produtos com estoque baixo
+      const baixo = await getProdutosEstoqueBaixo()
+      setProdutosBaixo(baixo)
+
+      // Vendas dos ultimos 7 dias
+      const dias: { label: string; value: number }[] = []
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date()
+        d.setDate(d.getDate() - i)
+        const diaStr = d.toISOString().split('T')[0]
+        const proximoDia = new Date(d)
+        proximoDia.setDate(proximoDia.getDate() + 1)
+        const { data: vendaDia } = await supabase
+          .from('comandas')
+          .select('total')
+          .eq('status', 'fechada')
+          .gte('created_at', diaStr)
+          .lt('created_at', proximoDia.toISOString().split('T')[0])
+        const total = vendaDia?.reduce((acc, v) => acc + (v.total || 0), 0) || 0
+        dias.push({
+          label: d.toLocaleDateString('pt-BR', { weekday: 'short' }).slice(0, 3),
+          value: total,
+        })
+      }
+      setVendasSemana(dias)
     } catch (error) {
       console.error('Erro ao carregar:', error)
     } finally {
@@ -116,7 +148,7 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="font-heading text-3xl lg:text-4xl font-bold">
-            {getGreeting()}!
+            {getGreeting()}{profile?.nome ? `, ${profile.nome.split(' ')[0]}` : ''}!
           </h1>
           <p className="text-sm text-text-muted">
             Veja como esta o movimento
@@ -159,6 +191,45 @@ export default function DashboardPage() {
           <span className="font-heading text-3xl font-bold text-text-dark">
             {formatCurrency(saldoCaixa)}
           </span>
+        </div>
+      </div>
+
+      {/* Grafico de vendas + Estoque baixo */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Grafico vendas ultimos 7 dias */}
+        <div className="p-5 bg-bg-card rounded-2xl space-y-3">
+          <h3 className="font-heading text-sm font-semibold text-text-muted">VENDAS DA SEMANA</h3>
+          <ChartBar data={vendasSemana} height={140} />
+        </div>
+
+        {/* Estoque baixo */}
+        <div className="p-5 bg-bg-card rounded-2xl space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-heading text-sm font-semibold text-text-muted">ESTOQUE BAIXO</h3>
+            {produtosBaixo.length > 0 && (
+              <span className="flex items-center gap-1 text-xs text-danger">
+                <AlertTriangle className="w-3 h-3" />
+                {produtosBaixo.length}
+              </span>
+            )}
+          </div>
+          {produtosBaixo.length === 0 ? (
+            <p className="text-sm text-text-muted py-8 text-center">Tudo em ordem!</p>
+          ) : (
+            <div className="space-y-2 max-h-[120px] overflow-y-auto">
+              {produtosBaixo.slice(0, 5).map(p => (
+                <div key={p.id} className="flex items-center justify-between py-1.5">
+                  <span className="text-sm text-text-white">{p.nome}</span>
+                  <span className="font-mono text-xs text-danger font-bold">{p.estoque}/{p.estoque_minimo}</span>
+                </div>
+              ))}
+              {produtosBaixo.length > 5 && (
+                <a href="/estoque" className="text-xs text-orange hover:underline">
+                  ver todos ({produtosBaixo.length})
+                </a>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

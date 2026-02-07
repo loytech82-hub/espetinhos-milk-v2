@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Plus, UtensilsCrossed } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { createMesa } from '@/lib/supabase-helpers'
@@ -10,19 +9,19 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { EmptyState } from '@/components/ui/empty-state'
-import { NovaComandaModal } from '@/components/comandas/nova-comanda-modal'
+import { MesaPanel } from '@/components/mesas/mesa-panel'
 import type { Mesa } from '@/lib/types'
 
 export default function MesasPage() {
-  const router = useRouter()
   const { toast } = useToast()
   const [mesas, setMesas] = useState<Mesa[]>([])
   const [loading, setLoading] = useState(true)
   const [novaModalOpen, setNovaModalOpen] = useState(false)
   const [novoNumero, setNovoNumero] = useState('')
   const [createLoading, setCreateLoading] = useState(false)
-  const [pedidoModalOpen, setPedidoModalOpen] = useState(false)
-  const [mesaSelecionada, setMesaSelecionada] = useState<number | null>(null)
+
+  // Painel lateral
+  const [mesaAberta, setMesaAberta] = useState<Mesa | null>(null)
 
   useEffect(() => {
     loadMesas()
@@ -68,26 +67,8 @@ export default function MesasPage() {
     }
   }
 
-  async function handleMesaClick(mesa: Mesa) {
-    if (mesa.status === 'livre') {
-      setMesaSelecionada(mesa.id)
-      setPedidoModalOpen(true)
-    } else if (mesa.status === 'ocupada') {
-      const { data } = await supabase
-        .from('comandas')
-        .select('id')
-        .eq('mesa_id', mesa.id)
-        .eq('status', 'aberta')
-        .limit(1)
-        .single()
-      if (data) {
-        router.push(`/comandas/${data.id}`)
-      }
-    }
-  }
-
-  function handleComandaCriada(id: number) {
-    router.push(`/comandas/${id}`)
+  function handleMesaClick(mesa: Mesa) {
+    setMesaAberta(mesa)
   }
 
   const statusColors: Record<string, string> = {
@@ -133,10 +114,6 @@ export default function MesasPage() {
           <span className="w-3 h-3 rounded-full bg-orange" />
           <span className="text-sm text-text-muted">Ocupada ({mesas.filter(m => m.status === 'ocupada').length})</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-warning" />
-          <span className="text-sm text-text-muted">Reservada ({mesas.filter(m => m.status === 'reservada').length})</span>
-        </div>
       </div>
 
       {loading ? (
@@ -168,6 +145,7 @@ export default function MesasPage() {
         </div>
       )}
 
+      {/* Modal para criar nova mesa */}
       <Modal open={novaModalOpen} onOpenChange={setNovaModalOpen} title="Nova Mesa" maxWidth="max-w-sm">
         <form onSubmit={handleCreateMesa} className="space-y-4">
           <Input
@@ -190,12 +168,14 @@ export default function MesasPage() {
         </form>
       </Modal>
 
-      <NovaComandaModal
-        open={pedidoModalOpen}
-        onOpenChange={(v) => { setPedidoModalOpen(v); if (!v) setMesaSelecionada(null) }}
-        onCreated={handleComandaCriada}
-        defaultMesaId={mesaSelecionada}
-      />
+      {/* Painel lateral da mesa */}
+      {mesaAberta && (
+        <MesaPanel
+          mesa={mesaAberta}
+          onClose={() => setMesaAberta(null)}
+          onMesaUpdated={loadMesas}
+        />
+      )}
     </div>
   )
 }

@@ -164,6 +164,13 @@ export default function ComandaDetalhePage() {
               key={item.id}
               className="flex items-center justify-between gap-4 px-5 py-4 bg-bg-card"
             >
+              {(item.produto as unknown as Produto)?.imagem_url ? (
+                <img
+                  src={(item.produto as unknown as Produto).imagem_url!}
+                  alt=""
+                  className="w-10 h-10 rounded-lg object-cover shrink-0"
+                />
+              ) : null}
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] text-text-white font-medium">
                   {(item.produto as unknown as Produto)?.nome || 'Produto'}

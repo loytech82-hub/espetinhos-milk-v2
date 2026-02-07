@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
+import { useEmpresa } from '@/lib/empresa-context'
 import type { UserRole } from '@/lib/types'
 
 interface NavItem {
@@ -45,6 +46,7 @@ const moreNav: NavItem[] = [
 export function Sidebar() {
   const pathname = usePathname()
   const { profile, role, signOut } = useAuth()
+  const { empresa } = useEmpresa()
 
   // Filtrar itens de navegacao por role
   function filterByRole(items: NavItem[]) {
@@ -81,9 +83,13 @@ export function Sidebar() {
     <aside className="hidden lg:flex flex-col w-[240px] min-h-screen p-6 justify-between bg-bg-page">
       <div className="flex flex-col gap-8">
         <Link href="/" className="flex items-center gap-3">
-          <Flame className="w-6 h-6 text-orange" />
+          {empresa?.logo_url ? (
+            <img src={empresa.logo_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+          ) : (
+            <Flame className="w-6 h-6 text-orange" />
+          )}
           <span className="font-heading text-xl font-semibold text-text-white">
-            ESPETINHOS
+            {empresa?.nome || 'ESPETINHOS'}
           </span>
         </Link>
 
