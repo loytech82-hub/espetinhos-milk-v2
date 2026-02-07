@@ -52,4 +52,12 @@ export interface CaixaMovimento {
   created_at: string
 }
 
+export interface Cliente {
+  id: number
+  nome: string
+  telefone: string | null
+  endereco: string | null
+  created_at: string
+}
+
 export type UserRole = 'admin' | 'caixa' | 'garcom'

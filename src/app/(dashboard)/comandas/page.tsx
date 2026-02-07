@@ -1,19 +1,25 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Search } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Plus, Search, ClipboardList } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
+import { StatusBadge } from '@/components/ui/status-badge'
+import { EmptyState } from '@/components/ui/empty-state'
+import { NovaComandaModal } from '@/components/comandas/nova-comanda-modal'
 import type { Comanda } from '@/lib/types'
 
 const filtros = ['todas', 'abertas', 'fechadas', 'delivery'] as const
 type Filtro = (typeof filtros)[number]
 
 export default function ComandasPage() {
+  const router = useRouter()
   const [comandas, setComandas] = useState<Comanda[]>([])
   const [filtro, setFiltro] = useState<Filtro>('todas')
   const [busca, setBusca] = useState('')
   const [loading, setLoading] = useState(true)
+  const [modalOpen, setModalOpen] = useState(false)
 
   useEffect(() => {
     loadComandas()
@@ -49,12 +55,24 @@ export default function ComandasPage() {
     return true
   })
 
+  function tipoBadgeVariant(tipo: string) {
+    if (tipo === 'mesa') return 'mesa' as const
+    if (tipo === 'balcao') return 'balcao' as const
+    return 'delivery' as const
+  }
+
+  function statusBadgeVariant(status: string) {
+    if (status === 'aberta') return 'success' as const
+    if (status === 'fechada') return 'muted' as const
+    return 'danger' as const
+  }
+
   return (
     <div className="p-6 lg:p-10 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="font-[family-name:var(--font-oswald)] text-3xl lg:text-4xl font-bold">
+          <h1 className="font-heading text-3xl lg:text-4xl font-bold">
             COMANDAS
           </h1>
           <p className="font-mono text-sm text-text-muted">
@@ -69,12 +87,15 @@ export default function ComandasPage() {
               placeholder="buscar..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              className="bg-transparent font-mono text-xs text-white placeholder:text-text-muted outline-none w-32"
+              className="bg-transparent font-mono text-xs text-text-white placeholder:text-text-muted outline-none w-32"
             />
           </div>
-          <button className="inline-flex items-center gap-2 h-10 px-5 bg-orange text-text-dark font-mono text-xs font-semibold rounded-2xl hover:bg-orange-hover transition-colors">
+          <button
+            onClick={() => setModalOpen(true)}
+            className="inline-flex items-center gap-2 h-10 px-5 bg-orange text-text-dark font-heading text-sm font-semibold rounded-2xl hover:bg-orange-hover transition-colors cursor-pointer"
+          >
             <Plus className="w-4 h-4" />
-            nova_comanda
+            Nova Comanda
           </button>
         </div>
       </div>
@@ -85,13 +106,13 @@ export default function ComandasPage() {
           <button
             key={f}
             onClick={() => setFiltro(f)}
-            className={`h-9 px-4 rounded-2xl font-mono text-xs font-semibold transition-colors whitespace-nowrap ${
+            className={`h-9 px-4 rounded-2xl font-heading text-sm font-semibold transition-colors whitespace-nowrap cursor-pointer ${
               filtro === f
                 ? 'bg-orange text-text-dark'
-                : 'bg-bg-elevated text-white hover:bg-bg-placeholder'
+                : 'bg-bg-elevated text-text-white hover:bg-bg-placeholder'
             }`}
           >
-            {f}
+            {f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
         ))}
       </div>
@@ -101,18 +122,22 @@ export default function ComandasPage() {
         <div className="flex items-center justify-center py-20">
           <span className="font-mono text-text-muted">carregando...</span>
         </div>
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={ClipboardList}
+          title="Nenhuma comanda encontrada"
+          description={busca ? 'Tente outra busca' : 'Crie a primeira comanda clicando no botao acima'}
+        />
       ) : (
         <div className="rounded-2xl overflow-hidden">
-          {/* Header da tabela */}
           <div className="hidden sm:grid grid-cols-5 h-11 px-5 bg-bg-card items-center">
             <span className="font-mono text-xs text-text-muted">comanda</span>
             <span className="font-mono text-xs text-text-muted">tipo</span>
-            <span className="font-mono text-xs text-text-muted">itens</span>
+            <span className="font-mono text-xs text-text-muted">cliente</span>
             <span className="font-mono text-xs text-text-muted">valor</span>
             <span className="font-mono text-xs text-text-muted">status</span>
           </div>
 
-          {/* Linhas */}
           <div className="space-y-px">
             {filtered.map((comanda) => (
               <a
@@ -120,57 +145,39 @@ export default function ComandasPage() {
                 href={`/comandas/${comanda.id}`}
                 className="grid grid-cols-2 sm:grid-cols-5 gap-2 px-5 py-4 sm:h-14 bg-bg-card items-center hover:bg-bg-elevated transition-colors cursor-pointer"
               >
-                <span className="font-mono text-[13px] text-white font-semibold">
+                <span className="font-mono text-[13px] text-text-white font-semibold">
                   #{String(comanda.numero).padStart(3, '0')}
                 </span>
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`w-1.5 h-1.5 ${
-                      comanda.tipo === 'mesa'
-                        ? 'bg-orange'
-                        : comanda.tipo === 'balcao'
-                          ? 'bg-success'
-                          : 'bg-purple-500'
-                    }`}
-                  />
-                  <span className="font-mono text-[13px] text-white">
+                <div>
+                  <StatusBadge variant={tipoBadgeVariant(comanda.tipo)} dot>
                     {comanda.tipo === 'mesa'
-                      ? `mesa ${String(comanda.mesa_id).padStart(2, '0')}`
-                      : comanda.tipo}
-                  </span>
+                      ? `Mesa ${String(comanda.mesa_id).padStart(2, '0')}`
+                      : comanda.tipo.charAt(0).toUpperCase() + comanda.tipo.slice(1)}
+                  </StatusBadge>
                 </div>
-                <span className="hidden sm:block font-mono text-[13px] text-white">
-                  —
+                <span className="hidden sm:block font-mono text-[13px] text-text-white truncate">
+                  {comanda.cliente_nome || '—'}
                 </span>
-                <span className="font-mono text-[13px] text-white">
+                <span className="font-mono text-[13px] text-text-white font-semibold">
                   {formatCurrency(comanda.total || 0)}
                 </span>
                 <div>
-                  <span
-                    className={`inline-flex px-3 py-1 rounded-2xl font-mono text-[11px] ${
-                      comanda.status === 'aberta'
-                        ? 'bg-success text-text-dark'
-                        : comanda.status === 'fechada'
-                          ? 'bg-bg-placeholder text-text-muted border border-[#3D3D3D]'
-                          : 'bg-red-600 text-white'
-                    }`}
-                  >
+                  <StatusBadge variant={statusBadgeVariant(comanda.status)}>
                     {comanda.status.toUpperCase()}
-                  </span>
+                  </StatusBadge>
                 </div>
               </a>
             ))}
           </div>
-
-          {filtered.length === 0 && (
-            <div className="p-10 bg-bg-card text-center">
-              <span className="font-mono text-sm text-text-muted">
-                nenhuma_comanda_encontrada
-              </span>
-            </div>
-          )}
         </div>
       )}
+
+      {/* Modal nova comanda */}
+      <NovaComandaModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        onCreated={(id) => router.push(`/comandas/${id}`)}
+      />
     </div>
   )
 }

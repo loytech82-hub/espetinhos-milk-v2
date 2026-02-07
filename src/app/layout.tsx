@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next"
 import { Oswald, JetBrains_Mono } from "next/font/google"
+import { ToastProvider } from "@/lib/toast-context"
 import "./globals.css"
 
 const oswald = Oswald({
@@ -38,7 +39,9 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className="dark">
       <body className={`${oswald.variable} ${jetbrains.variable} antialiased bg-bg-page text-text-white`}>
-        {children}
+        <ToastProvider>
+          {children}
+        </ToastProvider>
       </body>
     </html>
   )

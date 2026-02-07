@@ -1,16 +1,35 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-bg-page: #1A1A1A;
-  --color-bg-card: #212121;
-  --color-bg-elevated: #2D2D2D;
-  --color-bg-placeholder: #3D3D3D;
+  /* Fundo — preto carvão quente */
+  --color-bg-page: #141210;
+  --color-bg-card: #1E1C19;
+  --color-bg-elevated: #2A2722;
+  --color-bg-placeholder: #3A3630;
+
+  /* Laranja brasa — cor principal */
   --color-orange: #FF6B35;
   --color-orange-hover: #E85A24;
-  --color-success: #00D4AA;
-  --color-text-white: #FFFFFF;
-  --color-text-muted: #777777;
+  --color-orange-soft: rgba(255, 107, 53, 0.12);
+  --color-orange-glow: #FF8C5A;
+
+  /* Status */
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --color-info: #3B82F6;
+
+  /* Texto — branco quente */
+  --color-text-white: #F5F0EB;
+  --color-text-muted: #8B8178;
   --color-text-dark: #0D0D0D;
+
+  /* Tipos de comanda */
+  --color-delivery: #A855F7;
+  --color-balcao: #06B6D4;
+  --color-mesa: #FF6B35;
+
+  /* Fontes */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-jetbrains);
   --font-heading: var(--font-oswald);
@@ -18,10 +37,10 @@
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #3D3D3D #1A1A1A;
+  scrollbar-color: #3A3630 #141210;
 }
 
 body {
-  background: #1A1A1A;
-  color: #FFFFFF;
+  background: #141210;
+  color: #F5F0EB;
 }

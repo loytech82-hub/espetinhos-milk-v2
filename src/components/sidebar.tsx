@@ -9,6 +9,7 @@ import {
   DollarSign,
   Users,
   BarChart3,
+  UtensilsCrossed,
   Flame,
   LogOut,
 } from 'lucide-react'
@@ -18,6 +19,7 @@ import { cn } from '@/lib/utils'
 const navItems = [
   { href: '/', label: 'dashboard', icon: LayoutDashboard },
   { href: '/comandas', label: 'comandas', icon: ClipboardList },
+  { href: '/mesas', label: 'mesas', icon: UtensilsCrossed },
   { href: '/produtos', label: 'produtos', icon: Package },
   { href: '/caixa', label: 'caixa', icon: DollarSign },
   { href: '/clientes', label: 'clientes', icon: Users },
@@ -40,7 +42,7 @@ export function Sidebar() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-3">
           <Flame className="w-6 h-6 text-orange" />
-          <span className="font-[family-name:var(--font-oswald)] text-xl font-semibold text-text-white">
+          <span className="font-heading text-xl font-semibold text-text-white">
             ESPETINHOS
           </span>
         </Link>

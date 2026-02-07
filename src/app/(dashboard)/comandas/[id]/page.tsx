@@ -2,17 +2,32 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Plus, Trash2, CreditCard } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, CreditCard, XCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
+import { removeItemFromComanda, cancelComanda } from '@/lib/supabase-helpers'
+import { useToast } from '@/lib/toast-context'
+import { StatusBadge } from '@/components/ui/status-badge'
+import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { AddItemModal } from '@/components/comandas/add-item-modal'
+import { FecharComandaModal } from '@/components/comandas/fechar-comanda-modal'
 import type { Comanda, ComandaItem, Produto } from '@/lib/types'
 
 export default function ComandaDetalhePage() {
   const params = useParams()
   const router = useRouter()
+  const { toast } = useToast()
   const [comanda, setComanda] = useState<Comanda | null>(null)
   const [itens, setItens] = useState<ComandaItem[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Modais
+  const [addItemOpen, setAddItemOpen] = useState(false)
+  const [fecharOpen, setFecharOpen] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelLoading, setCancelLoading] = useState(false)
+  const [removingId, setRemovingId] = useState<number | null>(null)
 
   useEffect(() => {
     if (params.id) loadComanda(params.id as string)
@@ -31,6 +46,7 @@ export default function ComandaDetalhePage() {
         .from('comanda_itens')
         .select('*, produto:produtos(*)')
         .eq('comanda_id', id)
+        .order('created_at', { ascending: true })
       if (itensData) setItens(itensData)
     } catch (error) {
       console.error('Erro ao carregar comanda:', error)
@@ -39,9 +55,33 @@ export default function ComandaDetalhePage() {
     }
   }
 
-  async function removeItem(itemId: number) {
-    await supabase.from('comanda_itens').delete().eq('id', itemId)
-    setItens(itens.filter((i) => i.id !== itemId))
+  async function handleRemoveItem(itemId: number) {
+    if (!comanda) return
+    setRemovingId(itemId)
+    try {
+      await removeItemFromComanda(itemId, comanda.id)
+      toast('Item removido', 'success')
+      await loadComanda(String(comanda.id))
+    } catch (err: unknown) {
+      toast((err as Error).message, 'error')
+    } finally {
+      setRemovingId(null)
+    }
+  }
+
+  async function handleCancel() {
+    if (!comanda) return
+    setCancelLoading(true)
+    try {
+      await cancelComanda(comanda.id)
+      toast('Comanda cancelada', 'warning')
+      setCancelOpen(false)
+      router.push('/comandas')
+    } catch (err: unknown) {
+      toast((err as Error).message, 'error')
+    } finally {
+      setCancelLoading(false)
+    }
   }
 
   if (loading) {
@@ -61,50 +101,47 @@ export default function ComandaDetalhePage() {
   }
 
   const total = itens.reduce((acc, i) => acc + i.subtotal, 0)
+  const isAberta = comanda.status === 'aberta'
 
   return (
     <div className="p-6 lg:p-10 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
-          onClick={() => router.back()}
-          className="w-10 h-10 flex items-center justify-center bg-bg-elevated rounded-2xl hover:bg-bg-placeholder transition-colors"
+          onClick={() => router.push('/comandas')}
+          className="w-10 h-10 flex items-center justify-center bg-bg-elevated rounded-2xl hover:bg-bg-placeholder transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div className="flex-1">
-          <h1 className="font-[family-name:var(--font-oswald)] text-3xl font-bold">
+          <h1 className="font-heading text-3xl font-bold">
             COMANDA #{String(comanda.numero).padStart(3, '0')}
           </h1>
-          <p className="font-mono text-sm text-text-muted">
-            {comanda.tipo === 'mesa'
-              ? `mesa ${String(comanda.mesa_id).padStart(2, '0')}`
-              : comanda.tipo}{' '}
-            · {new Date(comanda.created_at).toLocaleString('pt-BR')}
-          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <StatusBadge variant={comanda.tipo === 'mesa' ? 'mesa' : comanda.tipo === 'balcao' ? 'balcao' : 'delivery'} dot>
+              {comanda.tipo === 'mesa' ? `Mesa ${String(comanda.mesa_id).padStart(2, '0')}` : comanda.tipo}
+            </StatusBadge>
+            <span className="font-mono text-sm text-text-muted">{new Date(comanda.created_at).toLocaleString('pt-BR')}</span>
+          </div>
         </div>
-        <span
-          className={`px-3 py-1 rounded-2xl font-mono text-[11px] ${
-            comanda.status === 'aberta'
-              ? 'bg-success text-text-dark'
-              : 'bg-bg-placeholder text-text-muted border border-[#3D3D3D]'
-          }`}
+        <StatusBadge
+          variant={comanda.status === 'aberta' ? 'success' : comanda.status === 'fechada' ? 'muted' : 'danger'}
         >
           {comanda.status.toUpperCase()}
-        </span>
+        </StatusBadge>
       </div>
 
       {/* Itens */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-[family-name:var(--font-oswald)] text-xl font-semibold">
-            ITENS
+          <h2 className="font-heading text-xl font-semibold">
+            ITENS ({itens.length})
           </h2>
-          {comanda.status === 'aberta' && (
-            <button className="inline-flex items-center gap-2 h-9 px-4 bg-orange text-text-dark font-mono text-xs font-semibold rounded-2xl hover:bg-orange-hover transition-colors">
+          {isAberta && (
+            <Button onClick={() => setAddItemOpen(true)} size="sm">
               <Plus className="w-3.5 h-3.5" />
-              adicionar
-            </button>
+              Adicionar
+            </Button>
           )}
         </div>
 
@@ -115,7 +152,7 @@ export default function ComandaDetalhePage() {
               className="flex items-center justify-between gap-4 px-5 py-4 bg-bg-card"
             >
               <div className="flex-1 min-w-0">
-                <p className="font-mono text-[13px] text-white">
+                <p className="text-[13px] text-text-white font-medium">
                   {(item.produto as unknown as Produto)?.nome || `produto_${item.produto_id}`}
                 </p>
                 <p className="font-mono text-xs text-text-muted">
@@ -123,13 +160,14 @@ export default function ComandaDetalhePage() {
                   {item.observacao && ` · ${item.observacao}`}
                 </p>
               </div>
-              <span className="font-mono text-[13px] text-white font-semibold">
+              <span className="font-heading text-[15px] text-text-white font-bold">
                 {formatCurrency(item.subtotal)}
               </span>
-              {comanda.status === 'aberta' && (
+              {isAberta && (
                 <button
-                  onClick={() => removeItem(item.id)}
-                  className="text-text-muted hover:text-red-500 transition-colors"
+                  onClick={() => handleRemoveItem(item.id)}
+                  disabled={removingId === item.id}
+                  className="text-text-muted hover:text-danger transition-colors cursor-pointer disabled:opacity-50"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -140,28 +178,76 @@ export default function ComandaDetalhePage() {
           {itens.length === 0 && (
             <div className="p-10 bg-bg-card text-center">
               <span className="font-mono text-sm text-text-muted">
-                nenhum_item_adicionado
+                Nenhum item adicionado
               </span>
+              {isAberta && (
+                <div className="mt-3">
+                  <Button size="sm" onClick={() => setAddItemOpen(true)}>
+                    <Plus size={14} /> Adicionar Primeiro Item
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* Total + Ações */}
+      {/* Total + Acoes */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 bg-bg-card rounded-2xl">
         <div>
           <span className="font-mono text-xs text-text-muted">TOTAL</span>
-          <p className="font-[family-name:var(--font-oswald)] text-3xl font-bold text-orange">
+          <p className="font-heading text-3xl font-bold text-orange">
             {formatCurrency(total)}
           </p>
         </div>
-        {comanda.status === 'aberta' && (
-          <button className="inline-flex items-center gap-2 h-10 px-6 bg-orange text-text-dark font-mono text-xs font-semibold rounded-2xl hover:bg-orange-hover transition-colors">
-            <CreditCard className="w-4 h-4" />
-            fechar_comanda
-          </button>
+        {isAberta && (
+          <div className="flex gap-3">
+            <Button variant="danger" size="sm" onClick={() => setCancelOpen(true)}>
+              <XCircle size={16} />
+              Cancelar
+            </Button>
+            <Button onClick={() => setFecharOpen(true)} disabled={itens.length === 0}>
+              <CreditCard size={16} />
+              Fechar Comanda
+            </Button>
+          </div>
+        )}
+        {comanda.status === 'fechada' && comanda.forma_pagamento && (
+          <div className="text-right">
+            <span className="font-mono text-xs text-text-muted">Pago via</span>
+            <p className="font-heading text-lg font-semibold text-success capitalize">
+              {comanda.forma_pagamento.replace('_', ' ')}
+            </p>
+          </div>
         )}
       </div>
+
+      {/* Modais */}
+      <AddItemModal
+        open={addItemOpen}
+        onOpenChange={setAddItemOpen}
+        comandaId={comanda.id}
+        onItemAdded={() => loadComanda(String(comanda.id))}
+      />
+
+      <FecharComandaModal
+        open={fecharOpen}
+        onOpenChange={setFecharOpen}
+        comandaId={comanda.id}
+        total={total}
+        onClosed={() => loadComanda(String(comanda.id))}
+      />
+
+      <ConfirmDialog
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        title="Cancelar Comanda"
+        description="Tem certeza que deseja cancelar esta comanda? Os itens serao devolvidos ao estoque. Esta acao nao pode ser desfeita."
+        onConfirm={handleCancel}
+        loading={cancelLoading}
+        confirmText="Sim, Cancelar"
+        variant="danger"
+      />
     </div>
   )
 }

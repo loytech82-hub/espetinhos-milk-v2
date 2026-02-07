@@ -1,15 +1,24 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Search, AlertTriangle } from 'lucide-react'
+import { Plus, Search, AlertTriangle, Package } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
+import { toggleProdutoAtivo } from '@/lib/supabase-helpers'
+import { useToast } from '@/lib/toast-context'
+import { StatusBadge } from '@/components/ui/status-badge'
+import { EmptyState } from '@/components/ui/empty-state'
+import { ProdutoModal } from '@/components/produtos/produto-modal'
 import type { Produto } from '@/lib/types'
 
 export default function ProdutosPage() {
+  const { toast } = useToast()
   const [produtos, setProdutos] = useState<Produto[]>([])
   const [busca, setBusca] = useState('')
   const [loading, setLoading] = useState(true)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editProduto, setEditProduto] = useState<Produto | null>(null)
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string>('todas')
 
   useEffect(() => {
     loadProdutos()
@@ -20,6 +29,7 @@ export default function ProdutosPage() {
       const { data } = await supabase
         .from('produtos')
         .select('*')
+        .order('categoria')
         .order('nome')
       if (data) setProdutos(data)
     } catch (error) {
@@ -29,26 +39,47 @@ export default function ProdutosPage() {
     }
   }
 
-  const filtered = produtos.filter((p) =>
-    busca
-      ? p.nome.toLowerCase().includes(busca.toLowerCase()) ||
-        p.categoria.toLowerCase().includes(busca.toLowerCase())
-      : true
-  )
+  // Categorias unicas
+  const categorias = ['todas', ...Array.from(new Set(produtos.map(p => p.categoria)))]
 
-  const estoqueBaixo = produtos.filter((p) => p.estoque <= p.estoque_minimo)
+  const filtered = produtos.filter((p) => {
+    if (categoriaFiltro !== 'todas' && p.categoria !== categoriaFiltro) return false
+    if (busca) {
+      const s = busca.toLowerCase()
+      return p.nome.toLowerCase().includes(s) || p.categoria.toLowerCase().includes(s)
+    }
+    return true
+  })
+
+  const estoqueBaixo = produtos.filter((p) => p.estoque <= p.estoque_minimo && p.ativo)
+
+  async function handleToggleAtivo(produto: Produto) {
+    try {
+      await toggleProdutoAtivo(produto.id, !produto.ativo)
+      toast(produto.ativo ? 'Produto desativado' : 'Produto ativado', 'success')
+      loadProdutos()
+    } catch (err: unknown) {
+      toast((err as Error).message, 'error')
+    }
+  }
+
+  function handleEdit(produto: Produto) {
+    setEditProduto(produto)
+    setModalOpen(true)
+  }
+
+  function handleNew() {
+    setEditProduto(null)
+    setModalOpen(true)
+  }
 
   return (
     <div className="p-6 lg:p-10 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="font-[family-name:var(--font-oswald)] text-3xl lg:text-4xl font-bold">
-            PRODUTOS
-          </h1>
-          <p className="font-mono text-sm text-text-muted">
-            // controle_de_estoque
-          </p>
+          <h1 className="font-heading text-3xl lg:text-4xl font-bold">PRODUTOS</h1>
+          <p className="font-mono text-sm text-text-muted">// controle_de_estoque</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 h-10 px-4 bg-bg-elevated rounded-2xl">
@@ -58,31 +89,57 @@ export default function ProdutosPage() {
               placeholder="buscar..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              className="bg-transparent font-mono text-xs text-white placeholder:text-text-muted outline-none w-32"
+              className="bg-transparent font-mono text-xs text-text-white placeholder:text-text-muted outline-none w-32"
             />
           </div>
-          <button className="inline-flex items-center gap-2 h-10 px-5 bg-orange text-text-dark font-mono text-xs font-semibold rounded-2xl hover:bg-orange-hover transition-colors">
+          <button
+            onClick={handleNew}
+            className="inline-flex items-center gap-2 h-10 px-5 bg-orange text-text-dark font-heading text-sm font-semibold rounded-2xl hover:bg-orange-hover transition-colors cursor-pointer"
+          >
             <Plus className="w-4 h-4" />
-            novo_produto
+            Novo Produto
           </button>
         </div>
       </div>
 
       {/* Alerta estoque baixo */}
       {estoqueBaixo.length > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-bg-card rounded-2xl border-l-4 border-orange">
-          <AlertTriangle className="w-4 h-4 text-orange shrink-0" />
-          <span className="font-mono text-[13px] text-white">
-            [WARNING] {estoqueBaixo.length} produto(s) com estoque_baixo
+        <div className="flex items-center gap-3 p-3 bg-warning/10 rounded-2xl border border-warning/30">
+          <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
+          <span className="text-sm text-text-white">
+            <strong>{estoqueBaixo.length}</strong> produto(s) com estoque baixo
           </span>
         </div>
       )}
 
-      {/* Tabela de produtos */}
+      {/* Filtros por categoria */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {categorias.map(cat => (
+          <button
+            key={cat}
+            onClick={() => setCategoriaFiltro(cat)}
+            className={`h-9 px-4 rounded-2xl font-heading text-sm font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+              categoriaFiltro === cat
+                ? 'bg-orange text-text-dark'
+                : 'bg-bg-elevated text-text-white hover:bg-bg-placeholder'
+            }`}
+          >
+            {cat.charAt(0).toUpperCase() + cat.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* Tabela */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <span className="font-mono text-text-muted">carregando...</span>
         </div>
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={Package}
+          title="Nenhum produto encontrado"
+          description="Adicione produtos ao cardapio"
+        />
       ) : (
         <div className="rounded-2xl overflow-hidden">
           <div className="hidden sm:grid grid-cols-5 h-11 px-5 bg-bg-card items-center">
@@ -97,48 +154,49 @@ export default function ProdutosPage() {
             {filtered.map((produto) => (
               <div
                 key={produto.id}
-                className="grid grid-cols-2 sm:grid-cols-5 gap-2 px-5 py-4 sm:h-14 bg-bg-card items-center hover:bg-bg-elevated transition-colors"
+                onClick={() => handleEdit(produto)}
+                className="grid grid-cols-2 sm:grid-cols-5 gap-2 px-5 py-4 sm:h-14 bg-bg-card items-center hover:bg-bg-elevated transition-colors cursor-pointer"
               >
-                <span className="font-mono text-[13px] text-white">
+                <span className="text-[13px] text-text-white font-medium">
                   {produto.nome}
                 </span>
-                <span className="font-mono text-[13px] text-text-muted">
+                <span className="text-[13px] text-text-muted">
                   {produto.categoria}
                 </span>
-                <span className="font-mono text-[13px] text-white">
+                <span className="font-heading text-[13px] text-text-white font-bold">
                   {formatCurrency(produto.preco)}
                 </span>
-                <span
-                  className={`font-mono text-[13px] ${
-                    produto.estoque <= produto.estoque_minimo
-                      ? 'text-orange'
-                      : 'text-success'
-                  }`}
-                >
-                  {produto.estoque} un.
-                </span>
-                <span
-                  className={`inline-flex w-fit px-3 py-1 rounded-2xl font-mono text-[11px] ${
-                    produto.ativo
-                      ? 'bg-success text-text-dark'
-                      : 'bg-bg-placeholder text-text-muted'
-                  }`}
-                >
-                  {produto.ativo ? 'ATIVO' : 'INATIVO'}
-                </span>
+                <div>
+                  <StatusBadge
+                    variant={produto.estoque <= produto.estoque_minimo ? 'warning' : 'success'}
+                    dot
+                  >
+                    {produto.estoque} un.
+                  </StatusBadge>
+                </div>
+                <div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleToggleAtivo(produto) }}
+                    className="cursor-pointer"
+                  >
+                    <StatusBadge variant={produto.ativo ? 'success' : 'muted'}>
+                      {produto.ativo ? 'ATIVO' : 'INATIVO'}
+                    </StatusBadge>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
-
-          {filtered.length === 0 && (
-            <div className="p-10 bg-bg-card text-center">
-              <span className="font-mono text-sm text-text-muted">
-                nenhum_produto_encontrado
-              </span>
-            </div>
-          )}
         </div>
       )}
+
+      {/* Modal */}
+      <ProdutoModal
+        open={modalOpen}
+        onOpenChange={(v) => { setModalOpen(v); if (!v) setEditProduto(null) }}
+        produto={editProduto}
+        onSaved={loadProdutos}
+      />
     </div>
   )
 }

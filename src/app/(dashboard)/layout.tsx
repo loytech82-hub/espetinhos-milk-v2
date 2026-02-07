@@ -1,5 +1,5 @@
-import { Sidebar } from '@/components/layout/sidebar'
-import { MobileNav } from '@/components/layout/mobile-nav'
+import { Sidebar } from '@/components/sidebar'
+import { MobileNav } from '@/components/mobile-nav'
 
 export default function DashboardLayout({
   children,
