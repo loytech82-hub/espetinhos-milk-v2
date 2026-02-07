@@ -22,7 +22,6 @@ export default function ComandaDetalhePage() {
   const [itens, setItens] = useState<ComandaItem[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Modais
   const [addItemOpen, setAddItemOpen] = useState(false)
   const [fecharOpen, setFecharOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
@@ -49,7 +48,7 @@ export default function ComandaDetalhePage() {
         .order('created_at', { ascending: true })
       if (itensData) setItens(itensData)
     } catch (error) {
-      console.error('Erro ao carregar comanda:', error)
+      console.error('Erro ao carregar pedido:', error)
     } finally {
       setLoading(false)
     }
@@ -74,7 +73,7 @@ export default function ComandaDetalhePage() {
     setCancelLoading(true)
     try {
       await cancelComanda(comanda.id)
-      toast('Comanda cancelada', 'warning')
+      toast('Pedido cancelado', 'warning')
       setCancelOpen(false)
       router.push('/comandas')
     } catch (err: unknown) {
@@ -87,7 +86,7 @@ export default function ComandaDetalhePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <span className="font-mono text-text-muted">carregando...</span>
+        <span className="text-text-muted">carregando...</span>
       </div>
     )
   }
@@ -95,13 +94,25 @@ export default function ComandaDetalhePage() {
   if (!comanda) {
     return (
       <div className="flex items-center justify-center h-full">
-        <span className="font-mono text-text-muted">comanda_nao_encontrada</span>
+        <span className="text-text-muted">Pedido nao encontrado</span>
       </div>
     )
   }
 
   const total = itens.reduce((acc, i) => acc + i.subtotal, 0)
   const isAberta = comanda.status === 'aberta'
+
+  const statusLabels: Record<string, string> = {
+    aberta: 'Aberto',
+    fechada: 'Pago',
+    cancelada: 'Cancelado',
+  }
+
+  const tipoLabels: Record<string, string> = {
+    mesa: 'Mesa',
+    balcao: 'Balcao',
+    delivery: 'Delivery',
+  }
 
   return (
     <div className="p-6 lg:p-10 space-y-6">
@@ -115,19 +126,21 @@ export default function ComandaDetalhePage() {
         </button>
         <div className="flex-1">
           <h1 className="font-heading text-3xl font-bold">
-            COMANDA #{String(comanda.numero).padStart(3, '0')}
+            Pedido <span className="font-mono">#{String(comanda.numero).padStart(3, '0')}</span>
           </h1>
           <div className="flex items-center gap-2 mt-1">
             <StatusBadge variant={comanda.tipo === 'mesa' ? 'mesa' : comanda.tipo === 'balcao' ? 'balcao' : 'delivery'} dot>
-              {comanda.tipo === 'mesa' ? `Mesa ${String(comanda.mesa_id).padStart(2, '0')}` : comanda.tipo}
+              {tipoLabels[comanda.tipo] || comanda.tipo}
             </StatusBadge>
-            <span className="font-mono text-sm text-text-muted">{new Date(comanda.created_at).toLocaleString('pt-BR')}</span>
+            <span className="text-sm text-text-muted">
+              {new Date(comanda.created_at).toLocaleString('pt-BR')}
+            </span>
           </div>
         </div>
         <StatusBadge
           variant={comanda.status === 'aberta' ? 'success' : comanda.status === 'fechada' ? 'muted' : 'danger'}
         >
-          {comanda.status.toUpperCase()}
+          {statusLabels[comanda.status] || comanda.status}
         </StatusBadge>
       </div>
 
@@ -135,7 +148,7 @@ export default function ComandaDetalhePage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="font-heading text-xl font-semibold">
-            ITENS ({itens.length})
+            Itens ({itens.length})
           </h2>
           {isAberta && (
             <Button onClick={() => setAddItemOpen(true)} size="sm">
@@ -153,9 +166,9 @@ export default function ComandaDetalhePage() {
             >
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] text-text-white font-medium">
-                  {(item.produto as unknown as Produto)?.nome || `produto_${item.produto_id}`}
+                  {(item.produto as unknown as Produto)?.nome || 'Produto'}
                 </p>
-                <p className="font-mono text-xs text-text-muted">
+                <p className="text-xs text-text-muted">
                   {item.quantidade}x {formatCurrency(item.preco_unitario)}
                   {item.observacao && ` · ${item.observacao}`}
                 </p>
@@ -177,7 +190,7 @@ export default function ComandaDetalhePage() {
 
           {itens.length === 0 && (
             <div className="p-10 bg-bg-card text-center">
-              <span className="font-mono text-sm text-text-muted">
+              <span className="text-sm text-text-muted">
                 Nenhum item adicionado
               </span>
               {isAberta && (
@@ -195,7 +208,7 @@ export default function ComandaDetalhePage() {
       {/* Total + Acoes */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 bg-bg-card rounded-2xl">
         <div>
-          <span className="font-mono text-xs text-text-muted">TOTAL</span>
+          <span className="text-xs text-text-muted">Total</span>
           <p className="font-heading text-3xl font-bold text-orange">
             {formatCurrency(total)}
           </p>
@@ -208,15 +221,19 @@ export default function ComandaDetalhePage() {
             </Button>
             <Button onClick={() => setFecharOpen(true)} disabled={itens.length === 0}>
               <CreditCard size={16} />
-              Fechar Comanda
+              Receber Pagamento
             </Button>
           </div>
         )}
         {comanda.status === 'fechada' && comanda.forma_pagamento && (
           <div className="text-right">
-            <span className="font-mono text-xs text-text-muted">Pago via</span>
+            <span className="text-xs text-text-muted">Pago via</span>
             <p className="font-heading text-lg font-semibold text-success capitalize">
-              {comanda.forma_pagamento.replace('_', ' ')}
+              {comanda.forma_pagamento === 'cartao_debito' ? 'Cartao Debito'
+                : comanda.forma_pagamento === 'cartao_credito' ? 'Cartao Credito'
+                  : comanda.forma_pagamento === 'pix' ? 'PIX'
+                    : comanda.forma_pagamento === 'dinheiro' ? 'Dinheiro'
+                      : comanda.forma_pagamento}
             </p>
           </div>
         )}
@@ -241,8 +258,8 @@ export default function ComandaDetalhePage() {
       <ConfirmDialog
         open={cancelOpen}
         onOpenChange={setCancelOpen}
-        title="Cancelar Comanda"
-        description="Tem certeza que deseja cancelar esta comanda? Os itens serao devolvidos ao estoque. Esta acao nao pode ser desfeita."
+        title="Cancelar Pedido"
+        description="Tem certeza que deseja cancelar este pedido? Os itens serao devolvidos ao estoque."
         onConfirm={handleCancel}
         loading={cancelLoading}
         confirmText="Sim, Cancelar"

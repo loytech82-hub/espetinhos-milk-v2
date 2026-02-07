@@ -37,13 +37,19 @@ export default function CaixaPage() {
   const saidas = movimentos.filter((m) => m.tipo === 'saida').reduce((acc, m) => acc + m.valor, 0)
   const saldo = entradas - saidas
 
+  const pagamentoLabels: Record<string, string> = {
+    dinheiro: 'Dinheiro',
+    pix: 'PIX',
+    cartao_debito: 'Cartao',
+    cartao_credito: 'Cartao',
+  }
+
   return (
     <div className="p-6 lg:p-10 space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="font-heading text-3xl lg:text-4xl font-bold">CAIXA</h1>
-          <p className="font-mono text-sm text-text-muted">// controle_financeiro</p>
+          <p className="text-sm text-text-muted">Seu caixa</p>
         </div>
         <button
           onClick={() => setModalOpen(true)}
@@ -54,12 +60,11 @@ export default function CaixaPage() {
         </button>
       </div>
 
-      {/* Resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="flex flex-col gap-3 p-5 bg-bg-card rounded-2xl">
           <div className="flex items-center gap-2">
             <ArrowUpCircle className="w-4 h-4 text-success" />
-            <span className="font-mono text-xs text-text-muted">ENTRADAS</span>
+            <span className="text-xs text-text-muted">Entradas</span>
           </div>
           <span className="font-heading text-3xl font-bold text-success">
             {formatCurrency(entradas)}
@@ -68,33 +73,32 @@ export default function CaixaPage() {
         <div className="flex flex-col gap-3 p-5 bg-bg-card rounded-2xl">
           <div className="flex items-center gap-2">
             <ArrowDownCircle className="w-4 h-4 text-danger" />
-            <span className="font-mono text-xs text-text-muted">SAIDAS</span>
+            <span className="text-xs text-text-muted">Saidas</span>
           </div>
           <span className="font-heading text-3xl font-bold text-danger">
             {formatCurrency(saidas)}
           </span>
         </div>
         <div className="flex flex-col gap-3 p-5 bg-orange rounded-2xl">
-          <span className="font-mono text-xs text-text-dark">SALDO</span>
+          <span className="text-xs text-text-dark">Saldo</span>
           <span className="font-heading text-3xl font-bold text-text-dark">
             {formatCurrency(saldo)}
           </span>
         </div>
       </div>
 
-      {/* Lista de movimentos */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <span className="font-mono text-text-muted">carregando...</span>
+          <span className="text-text-muted">carregando...</span>
         </div>
       ) : (
         <div className="space-y-4">
-          <h2 className="font-heading text-xl font-semibold">MOVIMENTOS HOJE</h2>
+          <h2 className="font-heading text-xl font-semibold">Movimentos de Hoje</h2>
           {movimentos.length === 0 ? (
             <EmptyState
               icon={Wallet}
               title="Nenhum movimento hoje"
-              description="Os movimentos do dia aparecerao aqui"
+              description="Os movimentos do dia aparecem aqui"
             />
           ) : (
             <div className="rounded-2xl overflow-hidden space-y-px">
@@ -113,8 +117,8 @@ export default function CaixaPage() {
                       <p className="text-[13px] text-text-white font-medium">
                         {mov.descricao}
                       </p>
-                      <p className="font-mono text-xs text-text-muted">
-                        {mov.forma_pagamento || 'caixa'} ·{' '}
+                      <p className="text-xs text-text-muted">
+                        {pagamentoLabels[mov.forma_pagamento || ''] || mov.forma_pagamento || 'caixa'} ·{' '}
                         {new Date(mov.created_at).toLocaleTimeString('pt-BR', {
                           hour: '2-digit',
                           minute: '2-digit',
@@ -137,7 +141,6 @@ export default function CaixaPage() {
         </div>
       )}
 
-      {/* Modal */}
       <NovoMovimentoModal
         open={modalOpen}
         onOpenChange={setModalOpen}

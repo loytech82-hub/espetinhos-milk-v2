@@ -14,7 +14,7 @@ export function formatCurrency(value: number): string {
 
 export function getGreeting(): string {
   const hour = new Date().getHours()
-  if (hour < 12) return 'bom_dia'
-  if (hour < 18) return 'boa_tarde'
-  return 'boa_noite'
+  if (hour < 12) return 'Bom dia'
+  if (hour < 18) return 'Boa tarde'
+  return 'Boa noite'
 }

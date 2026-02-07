@@ -39,7 +39,6 @@ export default function ProdutosPage() {
     }
   }
 
-  // Categorias unicas
   const categorias = ['todas', ...Array.from(new Set(produtos.map(p => p.categoria)))]
 
   const filtered = produtos.filter((p) => {
@@ -75,11 +74,10 @@ export default function ProdutosPage() {
 
   return (
     <div className="p-6 lg:p-10 space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl lg:text-4xl font-bold">PRODUTOS</h1>
-          <p className="font-mono text-sm text-text-muted">// controle_de_estoque</p>
+          <h1 className="font-heading text-3xl lg:text-4xl font-bold">CARDAPIO</h1>
+          <p className="text-sm text-text-muted">Seu cardapio</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 h-10 px-4 bg-bg-elevated rounded-2xl">
@@ -89,7 +87,7 @@ export default function ProdutosPage() {
               placeholder="buscar..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              className="bg-transparent font-mono text-xs text-text-white placeholder:text-text-muted outline-none w-32"
+              className="bg-transparent text-xs text-text-white placeholder:text-text-muted outline-none w-32"
             />
           </div>
           <button
@@ -102,7 +100,6 @@ export default function ProdutosPage() {
         </div>
       </div>
 
-      {/* Alerta estoque baixo */}
       {estoqueBaixo.length > 0 && (
         <div className="flex items-center gap-3 p-3 bg-warning/10 rounded-2xl border border-warning/30">
           <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
@@ -112,7 +109,6 @@ export default function ProdutosPage() {
         </div>
       )}
 
-      {/* Filtros por categoria */}
       <div className="flex gap-2 overflow-x-auto pb-1">
         {categorias.map(cat => (
           <button
@@ -129,10 +125,9 @@ export default function ProdutosPage() {
         ))}
       </div>
 
-      {/* Tabela */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <span className="font-mono text-text-muted">carregando...</span>
+          <span className="text-text-muted">carregando...</span>
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
@@ -143,11 +138,11 @@ export default function ProdutosPage() {
       ) : (
         <div className="rounded-2xl overflow-hidden">
           <div className="hidden sm:grid grid-cols-5 h-11 px-5 bg-bg-card items-center">
-            <span className="font-mono text-xs text-text-muted">produto</span>
-            <span className="font-mono text-xs text-text-muted">categoria</span>
-            <span className="font-mono text-xs text-text-muted">preco</span>
-            <span className="font-mono text-xs text-text-muted">estoque</span>
-            <span className="font-mono text-xs text-text-muted">status</span>
+            <span className="text-xs text-text-muted">Produto</span>
+            <span className="text-xs text-text-muted">Categoria</span>
+            <span className="text-xs text-text-muted">Preco</span>
+            <span className="text-xs text-text-muted">Estoque</span>
+            <span className="text-xs text-text-muted">Status</span>
           </div>
 
           <div className="space-y-px">
@@ -180,7 +175,7 @@ export default function ProdutosPage() {
                     className="cursor-pointer"
                   >
                     <StatusBadge variant={produto.ativo ? 'success' : 'muted'}>
-                      {produto.ativo ? 'ATIVO' : 'INATIVO'}
+                      {produto.ativo ? 'Ativo' : 'Inativo'}
                     </StatusBadge>
                   </button>
                 </div>
@@ -190,7 +185,6 @@ export default function ProdutosPage() {
         </div>
       )}
 
-      {/* Modal */}
       <ProdutoModal
         open={modalOpen}
         onOpenChange={(v) => { setModalOpen(v); if (!v) setEditProduto(null) }}

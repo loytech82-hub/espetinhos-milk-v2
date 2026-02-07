@@ -92,7 +92,7 @@ export function AddItemModal({ open, onOpenChange, comandaId, onItemAdded }: Add
   }
 
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title="Adicionar Item" maxWidth="max-w-2xl">
+    <Modal open={open} onOpenChange={onOpenChange} title="O que vai no pedido?" maxWidth="max-w-2xl">
       {!produtoSelecionado ? (
         // Tela de busca de produtos
         <div className="space-y-4">
@@ -179,7 +179,7 @@ export function AddItemModal({ open, onOpenChange, comandaId, onItemAdded }: Add
           </div>
 
           <Input
-            label="Observacao (opcional)"
+            label="Alguma obs?"
             value={observacao}
             onChange={e => setObservacao(e.target.value)}
             placeholder="Ex: sem cebola, bem passado..."

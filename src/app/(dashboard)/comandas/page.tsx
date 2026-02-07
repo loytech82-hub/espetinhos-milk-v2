@@ -10,13 +10,13 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { NovaComandaModal } from '@/components/comandas/nova-comanda-modal'
 import type { Comanda } from '@/lib/types'
 
-const filtros = ['todas', 'abertas', 'fechadas', 'delivery'] as const
+const filtros = ['todos', 'abertos', 'pagos', 'delivery'] as const
 type Filtro = (typeof filtros)[number]
 
 export default function ComandasPage() {
   const router = useRouter()
   const [comandas, setComandas] = useState<Comanda[]>([])
-  const [filtro, setFiltro] = useState<Filtro>('todas')
+  const [filtro, setFiltro] = useState<Filtro>('todos')
   const [busca, setBusca] = useState('')
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -33,16 +33,15 @@ export default function ComandasPage() {
         .order('created_at', { ascending: false })
       if (data) setComandas(data)
     } catch (error) {
-      console.error('Erro ao carregar comandas:', error)
+      console.error('Erro ao carregar pedidos:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  // Filtragem
   const filtered = comandas.filter((c) => {
-    if (filtro === 'abertas' && c.status !== 'aberta') return false
-    if (filtro === 'fechadas' && c.status !== 'fechada') return false
+    if (filtro === 'abertos' && c.status !== 'aberta') return false
+    if (filtro === 'pagos' && c.status !== 'fechada') return false
     if (filtro === 'delivery' && c.tipo !== 'delivery') return false
     if (busca) {
       const search = busca.toLowerCase()
@@ -67,17 +66,18 @@ export default function ComandasPage() {
     return 'danger' as const
   }
 
+  const statusLabels: Record<string, string> = {
+    aberta: 'Aberto',
+    fechada: 'Pago',
+    cancelada: 'Cancelado',
+  }
+
   return (
     <div className="p-6 lg:p-10 space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl lg:text-4xl font-bold">
-            COMANDAS
-          </h1>
-          <p className="font-mono text-sm text-text-muted">
-            // gestao_de_pedidos
-          </p>
+          <h1 className="font-heading text-3xl lg:text-4xl font-bold">PEDIDOS</h1>
+          <p className="text-sm text-text-muted">Seus pedidos</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 h-10 px-4 bg-bg-elevated rounded-2xl">
@@ -87,7 +87,7 @@ export default function ComandasPage() {
               placeholder="buscar..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              className="bg-transparent font-mono text-xs text-text-white placeholder:text-text-muted outline-none w-32"
+              className="bg-transparent text-xs text-text-white placeholder:text-text-muted outline-none w-32"
             />
           </div>
           <button
@@ -95,12 +95,11 @@ export default function ComandasPage() {
             className="inline-flex items-center gap-2 h-10 px-5 bg-orange text-text-dark font-heading text-sm font-semibold rounded-2xl hover:bg-orange-hover transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            Nova Comanda
+            Novo Pedido
           </button>
         </div>
       </div>
 
-      {/* Filtros */}
       <div className="flex gap-2 overflow-x-auto pb-1">
         {filtros.map((f) => (
           <button
@@ -117,25 +116,24 @@ export default function ComandasPage() {
         ))}
       </div>
 
-      {/* Tabela */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <span className="font-mono text-text-muted">carregando...</span>
+          <span className="text-text-muted">carregando...</span>
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={ClipboardList}
-          title="Nenhuma comanda encontrada"
-          description={busca ? 'Tente outra busca' : 'Crie a primeira comanda clicando no botao acima'}
+          title="Nenhum pedido encontrado"
+          description={busca ? 'Tente outra busca' : 'Crie o primeiro pedido clicando no botao acima'}
         />
       ) : (
         <div className="rounded-2xl overflow-hidden">
           <div className="hidden sm:grid grid-cols-5 h-11 px-5 bg-bg-card items-center">
-            <span className="font-mono text-xs text-text-muted">comanda</span>
-            <span className="font-mono text-xs text-text-muted">tipo</span>
-            <span className="font-mono text-xs text-text-muted">cliente</span>
-            <span className="font-mono text-xs text-text-muted">valor</span>
-            <span className="font-mono text-xs text-text-muted">status</span>
+            <span className="text-xs text-text-muted">Pedido</span>
+            <span className="text-xs text-text-muted">Tipo</span>
+            <span className="text-xs text-text-muted">Cliente</span>
+            <span className="text-xs text-text-muted">Valor</span>
+            <span className="text-xs text-text-muted">Status</span>
           </div>
 
           <div className="space-y-px">
@@ -150,20 +148,18 @@ export default function ComandasPage() {
                 </span>
                 <div>
                   <StatusBadge variant={tipoBadgeVariant(comanda.tipo)} dot>
-                    {comanda.tipo === 'mesa'
-                      ? `Mesa ${String(comanda.mesa_id).padStart(2, '0')}`
-                      : comanda.tipo.charAt(0).toUpperCase() + comanda.tipo.slice(1)}
+                    {comanda.tipo === 'mesa' ? 'Mesa' : comanda.tipo === 'balcao' ? 'Balcao' : 'Delivery'}
                   </StatusBadge>
                 </div>
-                <span className="hidden sm:block font-mono text-[13px] text-text-white truncate">
+                <span className="hidden sm:block text-[13px] text-text-white truncate">
                   {comanda.cliente_nome || '—'}
                 </span>
-                <span className="font-mono text-[13px] text-text-white font-semibold">
+                <span className="font-heading text-[13px] text-text-white font-bold">
                   {formatCurrency(comanda.total || 0)}
                 </span>
                 <div>
                   <StatusBadge variant={statusBadgeVariant(comanda.status)}>
-                    {comanda.status.toUpperCase()}
+                    {statusLabels[comanda.status] || comanda.status}
                   </StatusBadge>
                 </div>
               </a>
@@ -172,7 +168,6 @@ export default function ComandasPage() {
         </div>
       )}
 
-      {/* Modal nova comanda */}
       <NovaComandaModal
         open={modalOpen}
         onOpenChange={setModalOpen}

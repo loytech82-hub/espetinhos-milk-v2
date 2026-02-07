@@ -54,7 +54,7 @@ export function FecharComandaModal({ open, onOpenChange, comandaId, total, onClo
     setLoading(true)
     try {
       await closeComanda(comandaId, formaPagamento)
-      toast('Comanda fechada com sucesso!', 'success')
+      toast('Pagamento recebido!', 'success')
       onOpenChange(false)
       onClosed()
     } catch (err: unknown) {
@@ -65,7 +65,7 @@ export function FecharComandaModal({ open, onOpenChange, comandaId, total, onClo
   }
 
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title="Fechar Comanda" description="Selecione a forma de pagamento">
+    <Modal open={open} onOpenChange={onOpenChange} title="Receber Pagamento" description="Como o cliente vai pagar?">
       <div className="space-y-5">
         {/* Total */}
         <div className="text-center p-6 bg-bg-elevated rounded-xl">

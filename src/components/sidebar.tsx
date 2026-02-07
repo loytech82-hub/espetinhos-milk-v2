@@ -1,45 +1,85 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   ClipboardList,
-  Package,
   DollarSign,
+  UtensilsCrossed,
+  Package,
   Users,
   BarChart3,
-  UtensilsCrossed,
   Flame,
   LogOut,
+  MoreHorizontal,
+  Warehouse,
+  Settings,
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/lib/auth-context'
+import type { UserRole } from '@/lib/types'
 
-const navItems = [
-  { href: '/', label: 'dashboard', icon: LayoutDashboard },
-  { href: '/comandas', label: 'comandas', icon: ClipboardList },
-  { href: '/mesas', label: 'mesas', icon: UtensilsCrossed },
-  { href: '/produtos', label: 'produtos', icon: Package },
-  { href: '/caixa', label: 'caixa', icon: DollarSign },
-  { href: '/clientes', label: 'clientes', icon: Users },
-  { href: '/relatorios', label: 'relatorios', icon: BarChart3 },
+interface NavItem {
+  href: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  roles?: UserRole[] // Se vazio, todos podem ver
+}
+
+const mainNav: NavItem[] = [
+  { href: '/', label: 'Inicio', icon: LayoutDashboard },
+  { href: '/comandas', label: 'Pedidos', icon: ClipboardList },
+  { href: '/mesas', label: 'Mesas', icon: UtensilsCrossed },
+  { href: '/caixa', label: 'Caixa', icon: DollarSign, roles: ['admin', 'caixa'] },
+]
+
+const moreNav: NavItem[] = [
+  { href: '/produtos', label: 'Cardapio', icon: Package, roles: ['admin'] },
+  { href: '/estoque', label: 'Estoque', icon: Warehouse, roles: ['admin', 'caixa'] },
+  { href: '/clientes', label: 'Clientes', icon: Users },
+  { href: '/relatorios', label: 'Relatorios', icon: BarChart3, roles: ['admin'] },
+  { href: '/configuracoes', label: 'Config', icon: Settings, roles: ['admin'] },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
-  const router = useRouter()
+  const { profile, role, signOut } = useAuth()
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
+  // Filtrar itens de navegacao por role
+  function filterByRole(items: NavItem[]) {
+    return items.filter(item => !item.roles || item.roles.includes(role))
+  }
+
+  // Iniciais do usuario
+  const iniciais = profile?.nome
+    ? profile.nome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : '??'
+
+  const nomeExibicao = profile?.nome || 'Usuario'
+
+  function NavLink({ href, label, icon: Icon }: NavItem) {
+    const isActive = pathname === href || (href !== '/' && pathname.startsWith(href))
+    return (
+      <Link
+        href={href}
+        className={cn(
+          'flex items-center gap-3 h-10 px-3 rounded-2xl transition-colors',
+          isActive
+            ? 'text-text-white bg-bg-elevated'
+            : 'text-text-muted hover:text-text-white hover:bg-bg-card'
+        )}
+      >
+        <div className={cn('w-1.5 h-1.5 rounded-sm', isActive ? 'bg-orange' : 'bg-text-muted')} />
+        <Icon className="w-[18px] h-[18px]" />
+        <span className="text-[13px]">{label}</span>
+      </Link>
+    )
   }
 
   return (
     <aside className="hidden lg:flex flex-col w-[240px] min-h-screen p-6 justify-between bg-bg-page">
-      {/* Topo */}
       <div className="flex flex-col gap-8">
-        {/* Logo */}
         <Link href="/" className="flex items-center gap-3">
           <Flame className="w-6 h-6 text-orange" />
           <span className="font-heading text-xl font-semibold text-text-white">
@@ -47,39 +87,28 @@ export function Sidebar() {
           </span>
         </Link>
 
-        {/* Navegação */}
         <nav className="flex flex-col gap-1">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-3 h-10 px-3 rounded-2xl transition-colors',
-                  isActive
-                    ? 'text-text-white bg-bg-elevated'
-                    : 'text-text-muted hover:text-text-white hover:bg-bg-card'
-                )}
-              >
-                <div className={cn('w-1.5 h-1.5 rounded-sm', isActive ? 'bg-orange' : 'bg-text-muted')} />
-                <item.icon className="w-[18px] h-[18px]" />
-                <span className="font-[family-name:var(--font-jetbrains)] text-[13px]">
-                  {item.label}
-                </span>
-              </Link>
-            )
-          })}
+          {filterByRole(mainNav).map(item => <NavLink key={item.href} {...item} />)}
+
+          {/* Separador */}
+          <div className="flex items-center gap-2 mt-4 mb-1 px-3">
+            <MoreHorizontal className="w-3 h-3 text-text-muted" />
+            <span className="text-[11px] text-text-muted uppercase tracking-wider">Mais</span>
+          </div>
+
+          {filterByRole(moreNav).map(item => <NavLink key={item.href} {...item} />)}
         </nav>
       </div>
 
-      {/* Rodapé - Usuário */}
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 bg-bg-elevated rounded-2xl flex items-center justify-center">
-          <span className="font-[family-name:var(--font-jetbrains)] text-[11px] text-text-muted">AD</span>
+          <span className="text-[11px] text-text-muted">{iniciais}</span>
         </div>
-        <span className="font-[family-name:var(--font-jetbrains)] text-xs text-text-white">admin</span>
-        <button onClick={handleLogout} className="ml-auto text-text-muted hover:text-orange transition-colors">
+        <div className="flex flex-col">
+          <span className="text-xs text-text-white leading-tight">{nomeExibicao}</span>
+          <span className="text-[10px] text-text-muted leading-tight">{role}</span>
+        </div>
+        <button onClick={signOut} className="ml-auto text-text-muted hover:text-orange transition-colors cursor-pointer">
           <LogOut className="w-4 h-4" />
         </button>
       </div>

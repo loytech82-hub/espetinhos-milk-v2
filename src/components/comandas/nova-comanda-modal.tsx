@@ -14,6 +14,7 @@ interface NovaComandaModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreated: (id: number) => void
+  defaultMesaId?: number | null
 }
 
 const tipos = [
@@ -22,7 +23,7 @@ const tipos = [
   { value: 'delivery' as const, label: 'Delivery', icon: Truck, color: 'text-delivery' },
 ]
 
-export function NovaComandaModal({ open, onOpenChange, onCreated }: NovaComandaModalProps) {
+export function NovaComandaModal({ open, onOpenChange, onCreated, defaultMesaId }: NovaComandaModalProps) {
   const { toast } = useToast()
   const [tipo, setTipo] = useState<'mesa' | 'balcao' | 'delivery'>('mesa')
   const [mesaId, setMesaId] = useState<number | null>(null)
@@ -43,6 +44,14 @@ export function NovaComandaModal({ open, onOpenChange, onCreated }: NovaComandaM
         })
     }
   }, [open])
+
+  // Pre-selecionar mesa quando abrir via dashboard
+  useEffect(() => {
+    if (open && defaultMesaId) {
+      setTipo('mesa')
+      setMesaId(defaultMesaId)
+    }
+  }, [open, defaultMesaId])
 
   // Reset ao fechar
   useEffect(() => {
@@ -67,7 +76,7 @@ export function NovaComandaModal({ open, onOpenChange, onCreated }: NovaComandaM
     setLoading(true)
     try {
       const comanda = await createComanda(tipo, mesaId, clienteNome || null)
-      toast(`Comanda #${comanda.numero} criada!`, 'success')
+      toast(`Pedido #${comanda.numero} aberto!`, 'success')
       onOpenChange(false)
       onCreated(comanda.id)
     } catch (err: unknown) {
@@ -78,7 +87,7 @@ export function NovaComandaModal({ open, onOpenChange, onCreated }: NovaComandaM
   }
 
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title="Nova Comanda" description="Selecione o tipo e as informacoes">
+    <Modal open={open} onOpenChange={onOpenChange} title="Novo Pedido" description="Como vai ser o pedido?">
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Seletor de tipo */}
         <div className="grid grid-cols-3 gap-3">
@@ -142,7 +151,7 @@ export function NovaComandaModal({ open, onOpenChange, onCreated }: NovaComandaM
             Cancelar
           </Button>
           <Button type="submit" loading={loading}>
-            Criar Comanda
+            Abrir Pedido
           </Button>
         </div>
       </form>

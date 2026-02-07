@@ -5,18 +5,16 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   ClipboardList,
-  Package,
-  DollarSign,
   UtensilsCrossed,
+  DollarSign,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
-  { href: '/', label: 'inicio', icon: LayoutDashboard },
-  { href: '/comandas', label: 'comandas', icon: ClipboardList },
-  { href: '/mesas', label: 'mesas', icon: UtensilsCrossed },
-  { href: '/produtos', label: 'produtos', icon: Package },
-  { href: '/caixa', label: 'caixa', icon: DollarSign },
+  { href: '/', label: 'Inicio', icon: LayoutDashboard },
+  { href: '/comandas', label: 'Pedidos', icon: ClipboardList },
+  { href: '/mesas', label: 'Mesas', icon: UtensilsCrossed },
+  { href: '/caixa', label: 'Caixa', icon: DollarSign },
 ]
 
 export function MobileNav() {
@@ -37,7 +35,7 @@ export function MobileNav() {
               )}
             >
               <item.icon className="w-5 h-5" />
-              <span className="font-[family-name:var(--font-jetbrains)] text-[10px]">{item.label}</span>
+              <span className="text-[10px] font-medium">{item.label}</span>
             </Link>
           )
         })}

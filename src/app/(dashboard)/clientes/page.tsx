@@ -51,7 +51,7 @@ export default function ClientesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="font-heading text-3xl lg:text-4xl font-bold">CLIENTES</h1>
-          <p className="font-mono text-sm text-text-muted">// base_de_clientes</p>
+          <p className="text-sm text-text-muted">Seus clientes</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 h-10 px-4 bg-bg-elevated rounded-2xl">
@@ -61,7 +61,7 @@ export default function ClientesPage() {
               placeholder="buscar..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              className="bg-transparent font-mono text-xs text-text-white placeholder:text-text-muted outline-none w-32"
+              className="bg-transparent text-xs text-text-white placeholder:text-text-muted outline-none w-32"
             />
           </div>
           <button
@@ -76,15 +76,15 @@ export default function ClientesPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <span className="font-mono text-text-muted">carregando...</span>
+          <span className="text-text-muted">carregando...</span>
         </div>
       ) : filtered.length > 0 ? (
         <div className="rounded-2xl overflow-hidden">
           <div className="hidden sm:grid grid-cols-4 h-11 px-5 bg-bg-card items-center">
-            <span className="font-mono text-xs text-text-muted">nome</span>
-            <span className="font-mono text-xs text-text-muted">telefone</span>
-            <span className="font-mono text-xs text-text-muted">endereco</span>
-            <span className="font-mono text-xs text-text-muted">desde</span>
+            <span className="text-xs text-text-muted">Nome</span>
+            <span className="text-xs text-text-muted">Telefone</span>
+            <span className="text-xs text-text-muted">Endereco</span>
+            <span className="text-xs text-text-muted">Desde</span>
           </div>
           <div className="space-y-px">
             {filtered.map((cliente) => (
@@ -96,13 +96,13 @@ export default function ClientesPage() {
                 <span className="text-[13px] text-text-white font-medium">
                   {cliente.nome}
                 </span>
-                <span className="font-mono text-[13px] text-text-muted">
+                <span className="text-[13px] text-text-muted">
                   {cliente.telefone || '—'}
                 </span>
                 <span className="hidden sm:block text-[13px] text-text-muted truncate">
                   {cliente.endereco || '—'}
                 </span>
-                <span className="font-mono text-[13px] text-text-muted">
+                <span className="text-[13px] text-text-muted">
                   {new Date(cliente.created_at).toLocaleDateString('pt-BR')}
                 </span>
               </div>
@@ -117,7 +117,6 @@ export default function ClientesPage() {
         />
       )}
 
-      {/* Modal */}
       <ClienteModal
         open={modalOpen}
         onOpenChange={(v) => { setModalOpen(v); if (!v) setEditCliente(null) }}
