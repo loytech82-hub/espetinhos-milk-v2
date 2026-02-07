@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-bg-page: #1A1A1A;
+  --color-bg-card: #212121;
+  --color-bg-elevated: #2D2D2D;
+  --color-bg-placeholder: #3D3D3D;
+  --color-orange: #FF6B35;
+  --color-orange-hover: #E85A24;
+  --color-success: #00D4AA;
+  --color-text-white: #FFFFFF;
+  --color-text-muted: #777777;
+  --color-text-dark: #0D0D0D;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-jetbrains);
+  --font-heading: var(--font-oswald);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3D3D3D #1A1A1A;
+}
+
+body {
+  background: #1A1A1A;
+  color: #FFFFFF;
+}
