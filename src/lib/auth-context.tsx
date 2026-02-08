@@ -75,8 +75,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [fetchProfile])
 
-  // Role padrao: admin se nao tiver profile ainda
-  const role: UserRole = profile?.role || 'admin'
+  // Role padrao: garcom (mais seguro) enquanto profile nao carrega
+  const role: UserRole = profile?.role || 'garcom'
 
   return (
     <AuthContext.Provider value={{ user, profile, role, loading, signOut, refreshProfile }}>

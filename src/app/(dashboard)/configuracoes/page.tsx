@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Settings, Users, Tag, Plus, Shield, ShieldCheck, ShieldAlert, Building2, Save } from 'lucide-react'
+import { Settings, Users, Tag, Plus, Shield, ShieldCheck, ShieldAlert, Building2, Save, User, Mail, Lock, Pencil } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { updateEmpresa } from '@/lib/supabase-helpers'
 import { Button } from '@/components/ui/button'
@@ -28,13 +28,13 @@ const roleIcons: Record<UserRole, typeof Shield> = {
 }
 
 export default function ConfiguracoesPage() {
-  const { role } = useAuth()
+  const { role, user, profile, refreshProfile } = useAuth()
   const { toast } = useToast()
   const { empresa, refresh: refreshEmpresa } = useEmpresa()
   const [usuarios, setUsuarios] = useState<Profile[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'empresa' | 'usuarios' | 'categorias'>('empresa')
+  const [tab, setTab] = useState<'perfil' | 'empresa' | 'usuarios' | 'categorias'>('perfil')
 
   // Empresa form
   const [empNome, setEmpNome] = useState('')
@@ -49,6 +49,15 @@ export default function ConfiguracoesPage() {
   const [catNome, setCatNome] = useState('')
   const [catSaving, setCatSaving] = useState(false)
 
+  // Meu Perfil
+  const [perfilNome, setPerfilNome] = useState('')
+  const [perfilNovoEmail, setPerfilNovoEmail] = useState('')
+  const [perfilSenhaAtual, setPerfilSenhaAtual] = useState('')
+  const [perfilNovaSenha, setPerfilNovaSenha] = useState('')
+  const [perfilSavingNome, setPerfilSavingNome] = useState(false)
+  const [perfilSavingEmail, setPerfilSavingEmail] = useState(false)
+  const [perfilSavingSenha, setPerfilSavingSenha] = useState(false)
+
   // Modal de editar role
   const [roleModalOpen, setRoleModalOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null)
@@ -58,6 +67,13 @@ export default function ConfiguracoesPage() {
   useEffect(() => {
     loadData()
   }, [])
+
+  // Preencher nome do perfil
+  useEffect(() => {
+    if (profile) {
+      setPerfilNome(profile.nome || '')
+    }
+  }, [profile])
 
   // Preencher form da empresa quando carregar
   useEffect(() => {
@@ -136,6 +152,74 @@ export default function ConfiguracoesPage() {
     }
   }
 
+  // Salvar nome do perfil
+  async function handleSaveNome(e: React.FormEvent) {
+    e.preventDefault()
+    if (!perfilNome.trim()) { toast('Informe seu nome', 'error'); return }
+
+    setPerfilSavingNome(true)
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ nome: perfilNome.trim() })
+        .eq('id', user!.id)
+      if (error) throw new Error(error.message)
+      await refreshProfile()
+      toast('Nome atualizado!', 'success')
+    } catch (err: unknown) {
+      toast((err as Error).message, 'error')
+    } finally {
+      setPerfilSavingNome(false)
+    }
+  }
+
+  // Trocar email
+  async function handleTrocarEmail(e: React.FormEvent) {
+    e.preventDefault()
+    if (!perfilNovoEmail.trim()) { toast('Informe o novo email', 'error'); return }
+
+    setPerfilSavingEmail(true)
+    try {
+      const { error } = await supabase.auth.updateUser({ email: perfilNovoEmail.trim() })
+      if (error) throw new Error(error.message)
+      toast('Confirmacao enviada para o novo email!', 'success')
+      setPerfilNovoEmail('')
+    } catch (err: unknown) {
+      toast((err as Error).message, 'error')
+    } finally {
+      setPerfilSavingEmail(false)
+    }
+  }
+
+  // Trocar senha
+  async function handleTrocarSenha(e: React.FormEvent) {
+    e.preventDefault()
+    if (perfilNovaSenha.length < 6) { toast('A nova senha deve ter pelo menos 6 caracteres', 'error'); return }
+
+    setPerfilSavingSenha(true)
+    try {
+      // Re-autenticar com senha atual para confirmar identidade
+      const { error: reAuthError } = await supabase.auth.signInWithPassword({
+        email: user!.email!,
+        password: perfilSenhaAtual,
+      })
+      if (reAuthError) {
+        toast('Senha atual incorreta', 'error')
+        return
+      }
+
+      const { error } = await supabase.auth.updateUser({ password: perfilNovaSenha })
+      if (error) throw new Error(error.message)
+      toast('Senha alterada com sucesso!', 'success')
+      setPerfilSenhaAtual('')
+      setPerfilNovaSenha('')
+    } catch (err: unknown) {
+      toast((err as Error).message, 'error')
+    } finally {
+      setPerfilSavingSenha(false)
+    }
+  }
+
   // Alterar role do usuario
   async function handleChangeRole(e: React.FormEvent) {
     e.preventDefault()
@@ -178,7 +262,16 @@ export default function ConfiguracoesPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
+        <button
+          onClick={() => setTab('perfil')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+            tab === 'perfil' ? 'bg-orange text-text-dark' : 'bg-bg-card text-text-muted hover:text-text-white'
+          }`}
+        >
+          <User className="w-4 h-4" />
+          Meu Perfil
+        </button>
         <button
           onClick={() => setTab('empresa')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
@@ -207,6 +300,78 @@ export default function ConfiguracoesPage() {
           Categorias
         </button>
       </div>
+
+      {/* Tab: Meu Perfil */}
+      {tab === 'perfil' && (
+        <div className="space-y-6 max-w-lg">
+          <h2 className="font-heading text-xl font-semibold">Meu Perfil</h2>
+
+          {/* Trocar Nome */}
+          <form onSubmit={handleSaveNome} className="p-5 bg-bg-card rounded-2xl space-y-4">
+            <div className="flex items-center gap-2">
+              <Pencil className="w-4 h-4 text-text-muted" />
+              <h3 className="font-heading text-sm font-semibold text-text-muted">NOME</h3>
+            </div>
+            <Input
+              value={perfilNome}
+              onChange={e => setPerfilNome(e.target.value)}
+              placeholder="Seu nome"
+            />
+            <Button type="submit" size="sm" loading={perfilSavingNome}>
+              <Save className="w-4 h-4" />
+              Salvar Nome
+            </Button>
+          </form>
+
+          {/* Trocar Email */}
+          <form onSubmit={handleTrocarEmail} className="p-5 bg-bg-card rounded-2xl space-y-4">
+            <div className="flex items-center gap-2">
+              <Mail className="w-4 h-4 text-text-muted" />
+              <h3 className="font-heading text-sm font-semibold text-text-muted">TROCAR EMAIL</h3>
+            </div>
+            <p className="text-xs text-text-muted">
+              Email atual: <span className="font-mono text-text-white">{user?.email}</span>
+            </p>
+            <Input
+              type="email"
+              value={perfilNovoEmail}
+              onChange={e => setPerfilNovoEmail(e.target.value)}
+              placeholder="Novo email"
+            />
+            <p className="text-[11px] text-text-muted">
+              Um email de confirmacao sera enviado para o novo endereco.
+            </p>
+            <Button type="submit" size="sm" loading={perfilSavingEmail}>
+              <Mail className="w-4 h-4" />
+              Alterar Email
+            </Button>
+          </form>
+
+          {/* Trocar Senha */}
+          <form onSubmit={handleTrocarSenha} className="p-5 bg-bg-card rounded-2xl space-y-4">
+            <div className="flex items-center gap-2">
+              <Lock className="w-4 h-4 text-text-muted" />
+              <h3 className="font-heading text-sm font-semibold text-text-muted">TROCAR SENHA</h3>
+            </div>
+            <Input
+              type="password"
+              value={perfilSenhaAtual}
+              onChange={e => setPerfilSenhaAtual(e.target.value)}
+              placeholder="Senha atual"
+            />
+            <Input
+              type="password"
+              value={perfilNovaSenha}
+              onChange={e => setPerfilNovaSenha(e.target.value)}
+              placeholder="Nova senha (minimo 6 caracteres)"
+            />
+            <Button type="submit" size="sm" loading={perfilSavingSenha}>
+              <Lock className="w-4 h-4" />
+              Alterar Senha
+            </Button>
+          </form>
+        </div>
+      )}
 
       {/* Tab: Empresa */}
       {tab === 'empresa' && (
