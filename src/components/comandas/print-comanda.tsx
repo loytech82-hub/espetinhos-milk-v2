@@ -11,7 +11,7 @@ interface PrintComandaProps {
 
 // Componente de impressao para impressora termica 80mm
 // Usa window.print() com CSS @media print
-export function printComanda(comanda: Comanda, itens: ComandaItem[], empresaNome = 'Espetinhos 1000K') {
+export function printComanda(comanda: Comanda, itens: ComandaItem[], _empresaNome = 'ESPETINHOS 1000K') {
   const subtotal = itens.reduce((acc, i) => acc + i.subtotal, 0)
   const desconto = comanda.desconto || 0
   const total = comanda.status === 'fechada' ? (comanda.total || 0) : subtotal
@@ -72,7 +72,7 @@ export function printComanda(comanda: Comanda, itens: ComandaItem[], empresaNome
 </head>
 <body>
   <div class="header center">
-    <div class="bold big">${empresaNome}</div>
+    <div class="bold big">ESPETINHOS 1000K</div>
     <div style="margin-top:4px">Pedido #${String(comanda.numero).padStart(3, '0')}</div>
     <div>${tipoLabel[comanda.tipo] || comanda.tipo}${comanda.mesa_id ? ' ' + comanda.mesa_id : ''}${comanda.cliente_nome ? ' - ' + comanda.cliente_nome : ''}</div>
     <div>${dataHora}</div>
@@ -158,11 +158,11 @@ export function printComanda(comanda: Comanda, itens: ComandaItem[], empresaNome
 }
 
 // Componente visual (para preview se necessario)
-export function PrintComandaPreview({ comanda, itens, empresaNome = 'Espetinhos 1000K' }: PrintComandaProps) {
+export function PrintComandaPreview({ comanda, itens }: PrintComandaProps) {
   return (
     <button
       type="button"
-      onClick={() => printComanda(comanda, itens, empresaNome)}
+      onClick={() => printComanda(comanda, itens)}
       className="inline-flex items-center gap-2 h-10 px-4 text-sm font-semibold text-text-muted bg-bg-elevated rounded-lg hover:bg-bg-placeholder transition-colors cursor-pointer"
     >
       Imprimir

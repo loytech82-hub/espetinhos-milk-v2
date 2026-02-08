@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Plus, Search, ClipboardList, Trash2, ChevronRight } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
-import { cancelComanda } from '@/lib/supabase-helpers'
+// cancelComanda removido — usa API route server-side
 import { useToast } from '@/lib/toast-context'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -72,22 +72,15 @@ export default function ComandasPage() {
     return 'danger' as const
   }
 
-  // Excluir pedido (cancelado/pago pode ser removido; aberto cancela primeiro)
+  // Excluir pedido via API route (server-side com service_role key)
   async function handleDeleteComanda() {
     if (!deleteTarget) return
     setDeleteLoading(true)
     try {
-      if (deleteTarget.status === 'aberta') {
-        await cancelComanda(deleteTarget.id)
-        toast(`Pedido #${deleteTarget.numero} cancelado`, 'warning')
-      } else {
-        // Deletar itens e depois a comanda
-        await supabase.from('caixa').delete().eq('comanda_id', deleteTarget.id)
-        await supabase.from('estoque_movimentos').delete().eq('comanda_id', deleteTarget.id)
-        await supabase.from('comanda_itens').delete().eq('comanda_id', deleteTarget.id)
-        await supabase.from('comandas').delete().eq('id', deleteTarget.id)
-        toast(`Pedido #${deleteTarget.numero} excluido`, 'success')
-      }
+      const res = await fetch(`/api/comandas/${deleteTarget.id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erro ao excluir pedido')
+      toast(`Pedido #${deleteTarget.numero} excluido`, 'success')
       setDeleteTarget(null)
       loadComandas()
     } catch (err: unknown) {

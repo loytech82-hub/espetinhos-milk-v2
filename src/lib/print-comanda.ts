@@ -78,7 +78,7 @@ export function printComanda(
 </head>
 <body>
   <div class="center">
-    <h1>${empresaNome || 'ESPETINHOS 1000K'}</h1>
+    <h1>ESPETINHOS 1000K</h1>
     <div class="small">Sistema de Comandas</div>
   </div>
 

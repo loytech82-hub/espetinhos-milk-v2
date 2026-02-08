@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { abrirTurno } from '@/lib/supabase-helpers'
 import { useToast } from '@/lib/toast-context'
 
 interface AbrirTurnoModalProps {
@@ -37,7 +36,14 @@ export function AbrirTurnoModal({ open, onOpenChange, onCreated }: AbrirTurnoMod
 
     setLoading(true)
     try {
-      await abrirTurno(valor, observacao || undefined)
+      // Abrir turno via API route (server-side com service_role key)
+      const res = await fetch('/api/caixa/turno', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ valor_abertura: valor, observacao: observacao || null }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erro ao abrir caixa')
       toast('Caixa aberto com sucesso!', 'success')
       onOpenChange(false)
       onCreated()

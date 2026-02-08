@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Plus, Trash2, CreditCard, XCircle, Printer } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
-import { removeItemFromComanda, cancelComanda } from '@/lib/supabase-helpers'
+import { removeItemFromComanda } from '@/lib/supabase-helpers'
 import { useToast } from '@/lib/toast-context'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
@@ -71,11 +71,14 @@ export default function ComandaDetalhePage() {
     }
   }
 
+  // Cancelar pedido via API route (server-side com service_role key)
   async function handleCancel() {
     if (!comanda) return
     setCancelLoading(true)
     try {
-      await cancelComanda(comanda.id)
+      const res = await fetch(`/api/comandas/${comanda.id}`, { method: 'PATCH' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erro ao cancelar pedido')
       toast('Pedido cancelado', 'warning')
       setCancelOpen(false)
       router.push('/comandas')
