@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { closeComanda } from '@/lib/supabase-helpers'
 import { useToast } from '@/lib/toast-context'
 import { formatCurrency } from '@/lib/utils'
 import { Banknote, QrCode, CreditCard, Percent } from 'lucide-react'
@@ -63,12 +62,23 @@ export function FecharComandaModal({ open, onOpenChange, comandaId, subtotal, on
 
     setLoading(true)
     try {
-      await closeComanda(comandaId, formaPagamento, desconto)
+      const res = await fetch(`/api/comandas/${comandaId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ formaPagamento, desconto }),
+      })
+      const data = await res.json()
+
+      if (!res.ok || data.error) {
+        toast(data.error || 'Erro ao fechar comanda', 'error')
+        return
+      }
+
       toast('Pagamento recebido!', 'success')
       onOpenChange(false)
       onClosed()
     } catch (err: unknown) {
-      toast((err as Error).message, 'error')
+      toast((err as Error).message || 'Erro ao processar pagamento', 'error')
     } finally {
       setLoading(false)
     }

@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Plus, Trash2, CreditCard, XCircle, Printer } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
-import { removeItemFromComanda } from '@/lib/supabase-helpers'
 import { useToast } from '@/lib/toast-context'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
@@ -61,7 +60,13 @@ export default function ComandaDetalhePage() {
     if (!comanda) return
     setRemovingId(itemId)
     try {
-      await removeItemFromComanda(itemId, comanda.id)
+      const res = await fetch(`/api/comandas/${comanda.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erro ao remover item')
       toast('Item removido', 'success')
       await loadComanda(comanda.id)
     } catch (err: unknown) {
