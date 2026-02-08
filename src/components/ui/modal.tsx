@@ -30,8 +30,8 @@ export function Modal({ open, onOpenChange, title, description, children, maxWid
                 </Dialog.Description>
               )}
             </div>
-            <Dialog.Close className="text-text-muted hover:text-text-white transition-colors p-1 rounded-lg hover:bg-bg-elevated">
-              <X size={20} />
+            <Dialog.Close className="text-text-muted hover:text-text-white transition-colors p-2 rounded-xl hover:bg-bg-elevated">
+              <X size={24} />
             </Dialog.Close>
           </div>
           {/* Conteudo scrollavel */}

@@ -143,6 +143,10 @@ export function AddItemModal({ open, onOpenChange, comandaId, onItemAdded }: Add
               </div>
             )}
           </div>
+
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="w-full">
+            Fechar
+          </Button>
         </div>
       ) : (
         // Tela de quantidade/observacao
