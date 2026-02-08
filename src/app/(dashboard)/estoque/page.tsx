@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { EntradaEstoqueModal } from '@/components/estoque/entrada-estoque-modal'
 import { AjusteEstoqueModal } from '@/components/estoque/ajuste-estoque-modal'
+import { useAuth } from '@/lib/auth-context'
+import { AccessDenied } from '@/components/ui/access-denied'
 import type { Produto, EstoqueMovimento } from '@/lib/types'
 
 // Cores e icones por tipo de movimentacao
@@ -22,6 +24,7 @@ const tipoConfig: Record<string, { cor: string; icone: typeof ArrowUpCircle; lab
 }
 
 export default function EstoquePage() {
+  const { role } = useAuth()
   const [movimentos, setMovimentos] = useState<EstoqueMovimento[]>([])
   const [produtos, setProdutos] = useState<Produto[]>([])
   const [produtosBaixo, setProdutosBaixo] = useState<Produto[]>([])
@@ -58,6 +61,9 @@ export default function EstoquePage() {
       setLoading(false)
     }
   }
+
+  // Admin e caixa podem acessar
+  if (role === 'garcom') return <AccessDenied message="Garcons nao tem acesso ao estoque" />
 
   return (
     <div className="p-6 lg:p-10 space-y-6">

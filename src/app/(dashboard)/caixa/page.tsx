@@ -10,9 +10,12 @@ import { Button } from '@/components/ui/button'
 import { NovoMovimentoModal } from '@/components/caixa/novo-movimento-modal'
 import { AbrirTurnoModal } from '@/components/caixa/abrir-turno-modal'
 import { FecharTurnoModal } from '@/components/caixa/fechar-turno-modal'
+import { useAuth } from '@/lib/auth-context'
+import { AccessDenied } from '@/components/ui/access-denied'
 import type { CaixaMovimento, CaixaTurno } from '@/lib/types'
 
 export default function CaixaPage() {
+  const { role } = useAuth()
   const [movimentos, setMovimentos] = useState<CaixaMovimento[]>([])
   const [turno, setTurno] = useState<CaixaTurno | null>(null)
   const [loading, setLoading] = useState(true)
@@ -62,6 +65,9 @@ export default function CaixaPage() {
   const horaAbertura = turno
     ? new Date(turno.aberto_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
     : null
+
+  // Admin e caixa podem acessar
+  if (role === 'garcom') return <AccessDenied message="Garcons nao tem acesso ao caixa" />
 
   return (
     <div className="p-6 lg:p-10 space-y-6">

@@ -19,29 +19,45 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
+import type { UserRole } from '@/lib/types'
 
-const mainItems = [
+interface NavItem {
+  href: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  roles?: UserRole[]
+}
+
+const mainItems: NavItem[] = [
   { href: '/', label: 'Inicio', icon: LayoutDashboard },
   { href: '/comandas', label: 'Pedidos', icon: ClipboardList },
   { href: '/mesas', label: 'Mesas', icon: UtensilsCrossed },
-  { href: '/caixa', label: 'Caixa', icon: DollarSign },
+  { href: '/caixa', label: 'Caixa', icon: DollarSign, roles: ['admin', 'caixa'] },
 ]
 
-const moreItems = [
-  { href: '/produtos', label: 'Cardapio', icon: Package },
-  { href: '/estoque', label: 'Estoque', icon: Warehouse },
+const moreItems: NavItem[] = [
+  { href: '/produtos', label: 'Cardapio', icon: Package, roles: ['admin'] },
+  { href: '/estoque', label: 'Estoque', icon: Warehouse, roles: ['admin', 'caixa'] },
   { href: '/clientes', label: 'Clientes', icon: Users },
-  { href: '/relatorios', label: 'Relatorios', icon: BarChart3 },
-  { href: '/configuracoes', label: 'Configuracoes', icon: Settings },
+  { href: '/relatorios', label: 'Relatorios', icon: BarChart3, roles: ['admin'] },
+  { href: '/configuracoes', label: 'Configuracoes', icon: Settings, roles: ['admin'] },
 ]
 
 export function MobileNav() {
   const pathname = usePathname()
-  const { signOut } = useAuth()
+  const { role, signOut } = useAuth()
   const [drawerOpen, setDrawerOpen] = useState(false)
 
+  // Filtrar itens por role do usuario
+  function filterByRole(items: NavItem[]) {
+    return items.filter(item => !item.roles || item.roles.includes(role))
+  }
+
+  const filteredMain = filterByRole(mainItems)
+  const filteredMore = filterByRole(moreItems)
+
   // Verifica se alguma pagina do "Mais" esta ativa
-  const moreActive = moreItems.some(item =>
+  const moreActive = filteredMore.some(item =>
     pathname === item.href || pathname.startsWith(item.href)
   )
 
@@ -50,7 +66,7 @@ export function MobileNav() {
       {/* Bottom nav fixo */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-bg-card border-t border-border">
         <div className="flex justify-around items-center h-16 px-2">
-          {mainItems.map((item) => {
+          {filteredMain.map((item) => {
             const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
             return (
               <Link
@@ -109,7 +125,7 @@ export function MobileNav() {
 
             {/* Itens do menu */}
             <div className="px-3 pb-3 space-y-1">
-              {moreItems.map((item) => {
+              {filteredMore.map((item) => {
                 const isActive = pathname === item.href || pathname.startsWith(item.href)
                 return (
                   <Link

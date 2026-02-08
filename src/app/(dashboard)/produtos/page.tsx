@@ -6,13 +6,16 @@ import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { toggleProdutoAtivo } from '@/lib/supabase-helpers'
 import { useToast } from '@/lib/toast-context'
+import { useAuth } from '@/lib/auth-context'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { EmptyState } from '@/components/ui/empty-state'
+import { AccessDenied } from '@/components/ui/access-denied'
 import { ProdutoModal } from '@/components/produtos/produto-modal'
 import type { Produto } from '@/lib/types'
 
 export default function ProdutosPage() {
   const { toast } = useToast()
+  const { role } = useAuth()
   const [produtos, setProdutos] = useState<Produto[]>([])
   const [busca, setBusca] = useState('')
   const [loading, setLoading] = useState(true)
@@ -71,6 +74,9 @@ export default function ProdutosPage() {
     setEditProduto(null)
     setModalOpen(true)
   }
+
+  // Somente admin pode acessar
+  if (role !== 'admin') return <AccessDenied />
 
   return (
     <div className="p-6 lg:p-10 space-y-6">

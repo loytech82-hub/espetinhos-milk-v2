@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { printRelatorio } from '@/lib/print-relatorio'
 import { useEmpresa } from '@/lib/empresa-context'
+import { useAuth } from '@/lib/auth-context'
+import { AccessDenied } from '@/components/ui/access-denied'
 
 type Periodo = 'hoje' | 'semana' | 'mes' | 'tudo'
 
@@ -39,6 +41,7 @@ const periodos: { value: Periodo; label: string }[] = [
 ]
 
 export default function RelatoriosPage() {
+  const { role } = useAuth()
   const { empresa } = useEmpresa()
   const [periodo, setPeriodo] = useState<Periodo>('hoje')
   const [resumo, setResumo] = useState<ResumoVendas>({
@@ -125,6 +128,9 @@ export default function RelatoriosPage() {
     cartao: 'Cartao',
     nao_informado: 'Outros',
   }
+
+  // Somente admin pode acessar
+  if (role !== 'admin') return <AccessDenied />
 
   return (
     <div className="p-6 lg:p-10 space-y-6">

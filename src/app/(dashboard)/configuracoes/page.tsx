@@ -12,6 +12,7 @@ import { ImageUpload } from '@/components/ui/image-upload'
 import { useToast } from '@/lib/toast-context'
 import { useAuth } from '@/lib/auth-context'
 import { useEmpresa } from '@/lib/empresa-context'
+import { AccessDenied } from '@/components/ui/access-denied'
 import type { Profile, Categoria, UserRole } from '@/lib/types'
 
 const roleLabels: Record<UserRole, string> = {
@@ -158,17 +159,7 @@ export default function ConfiguracoesPage() {
   }
 
   // Somente admin pode acessar
-  if (role !== 'admin') {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center space-y-2">
-          <ShieldAlert className="w-10 h-10 text-danger mx-auto" />
-          <p className="font-heading text-lg font-bold">Acesso Negado</p>
-          <p className="text-sm text-text-muted">Somente administradores podem acessar esta pagina</p>
-        </div>
-      </div>
-    )
-  }
+  if (role !== 'admin') return <AccessDenied />
 
   if (loading) {
     return (
