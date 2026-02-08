@@ -49,8 +49,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
-    // Buscar sessao inicial
-    supabase.auth.getUser().then(({ data: { user: currentUser } }) => {
+    // Usar getSession (cache local) em vez de getUser (rede) — muito mais rapido
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const currentUser = session?.user ?? null
       setUser(currentUser)
       if (currentUser) {
         fetchProfile(currentUser.id)

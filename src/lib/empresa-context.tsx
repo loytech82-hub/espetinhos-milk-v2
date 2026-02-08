@@ -17,13 +17,21 @@ const EmpresaContext = createContext<EmpresaContextType>({
 })
 
 export function EmpresaProvider({ children }: { children: React.ReactNode }) {
-  const [empresa, setEmpresa] = useState<Empresa | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [empresa, setEmpresa] = useState<Empresa | null>(() => {
+    // Carregar do cache local para render instantaneo
+    if (typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem('empresa')
+      if (cached) return JSON.parse(cached) as Empresa
+    }
+    return null
+  })
+  const [loading, setLoading] = useState(!empresa)
 
   const refresh = useCallback(async () => {
     try {
       const data = await getEmpresa()
       setEmpresa(data)
+      if (data) sessionStorage.setItem('empresa', JSON.stringify(data))
     } catch (error) {
       console.error('Erro ao carregar empresa:', error)
     } finally {

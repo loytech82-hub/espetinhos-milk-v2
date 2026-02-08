@@ -32,67 +32,39 @@ export default function DashboardPage() {
   async function loadDashboard() {
     try {
       const hoje = new Date().toISOString().split('T')[0]
-
-      // Carrega mesas
-      const { data: mesasData } = await supabase
-        .from('mesas')
-        .select('*')
-        .order('numero')
-      if (mesasData) setMesas(mesasData)
-
-      // Comandas abertas
-      const { data: abertasData } = await supabase
-        .from('comandas')
-        .select('id')
-        .eq('status', 'aberta')
-      if (abertasData) setComandasAbertas(abertasData.length)
-
-      // Ultimos 3 pedidos
-      const { data: comandasData } = await supabase
-        .from('comandas')
-        .select('*')
-        .order('aberta_em', { ascending: false })
-        .limit(3)
-      if (comandasData) setComandas(comandasData)
-
-      // Vendas de hoje
-      const { data: vendasData } = await supabase
-        .from('comandas')
-        .select('total')
-        .eq('status', 'fechada')
-        .gte('aberta_em', hoje)
-      if (vendasData) {
-        setVendasHoje(vendasData.reduce((acc, v) => acc + (v.total || 0), 0))
-      }
-
-      // Saldo do caixa
-      const { data: caixaData } = await supabase
-        .from('caixa')
-        .select('tipo, valor')
-        .gte('created_at', hoje)
-      if (caixaData) {
-        const saldo = caixaData.reduce((acc, m) => {
-          return m.tipo === 'entrada' ? acc + m.valor : acc - m.valor
-        }, 0)
-        setSaldoCaixa(saldo)
-      }
-
-      // Produtos com estoque baixo
-      const baixo = await getProdutosEstoqueBaixo()
-      setProdutosBaixo(baixo)
-
-      // Vendas dos ultimos 7 dias — 1 query batch (era 7 queries separadas)
       const seteDiasAtras = new Date()
       seteDiasAtras.setDate(seteDiasAtras.getDate() - 6)
       const dataInicio = seteDiasAtras.toISOString().split('T')[0]
 
-      const { data: vendasSemanaData } = await supabase
-        .from('comandas')
-        .select('total, aberta_em')
-        .eq('status', 'fechada')
-        .gte('aberta_em', dataInicio)
+      // Todas as queries em paralelo (era sequencial, ~4s → ~500ms)
+      const [
+        { data: mesasData },
+        { data: abertasData },
+        { data: comandasData },
+        { data: vendasData },
+        { data: caixaData },
+        baixo,
+        { data: vendasSemanaData },
+      ] = await Promise.all([
+        supabase.from('mesas').select('*').order('numero'),
+        supabase.from('comandas').select('id').eq('status', 'aberta'),
+        supabase.from('comandas').select('*').order('aberta_em', { ascending: false }).limit(3),
+        supabase.from('comandas').select('total').eq('status', 'fechada').gte('aberta_em', hoje),
+        supabase.from('caixa').select('tipo, valor').gte('created_at', hoje),
+        getProdutosEstoqueBaixo(),
+        supabase.from('comandas').select('total, aberta_em').eq('status', 'fechada').gte('aberta_em', dataInicio),
+      ])
 
-      // Agrupar por dia no cliente
+      if (mesasData) setMesas(mesasData)
+      if (abertasData) setComandasAbertas(abertasData.length)
+      if (comandasData) setComandas(comandasData)
+      if (vendasData) setVendasHoje(vendasData.reduce((acc, v) => acc + (v.total || 0), 0))
+      if (caixaData) {
+        setSaldoCaixa(caixaData.reduce((acc, m) => m.tipo === 'entrada' ? acc + m.valor : acc - m.valor, 0))
+      }
+      setProdutosBaixo(baixo)
+
+      // Agrupar vendas por dia
       const vendasPorDia = new Map<string, number>()
       vendasSemanaData?.forEach(v => {
         const dia = v.aberta_em.split('T')[0]
