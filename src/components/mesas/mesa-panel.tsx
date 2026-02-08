@@ -363,7 +363,7 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
                     />
                   </div>
 
-                  <div className="space-y-4 max-h-[50vh] overflow-y-auto">
+                  <div className="space-y-4 pb-40 sm:pb-0">
                     {Array.from(grouped.entries()).map(([categoria, prods]) => (
                       <div key={categoria}>
                         <h3 className="font-heading text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 px-1">

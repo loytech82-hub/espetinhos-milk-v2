@@ -17,8 +17,9 @@ export function Modal({ open, onOpenChange, title, description, children, maxWid
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className={`fixed left-1/2 -translate-x-1/2 z-50 w-[95vw] ${maxWidth} bg-bg-card border border-bg-elevated rounded-xl shadow-2xl p-6 top-[env(safe-area-inset-top,0.5rem)] mt-2 max-h-[85dvh] overflow-y-auto lg:top-1/2 lg:-translate-y-1/2 lg:mt-0 lg:max-h-[90vh] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95`}>
-          <div className="flex items-center justify-between mb-4">
+        <Dialog.Content className={`fixed z-50 bg-bg-card shadow-2xl inset-0 flex flex-col lg:inset-auto lg:left-1/2 lg:-translate-x-1/2 lg:top-1/2 lg:-translate-y-1/2 lg:w-[95vw] ${maxWidth} lg:rounded-xl lg:border lg:border-bg-elevated lg:max-h-[90vh] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95`}>
+          {/* Header fixo */}
+          <div className="shrink-0 flex items-center justify-between p-4 pb-3 border-b border-bg-elevated lg:p-6 lg:pb-4 lg:border-0">
             <div>
               <Dialog.Title className="font-heading text-xl font-bold text-text-white">
                 {title}
@@ -33,7 +34,10 @@ export function Modal({ open, onOpenChange, title, description, children, maxWid
               <X size={20} />
             </Dialog.Close>
           </div>
-          {children}
+          {/* Conteudo scrollavel */}
+          <div className="flex-1 overflow-y-auto p-4 pt-3 lg:p-6 lg:pt-0">
+            {children}
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

@@ -107,7 +107,7 @@ export function AddItemModal({ open, onOpenChange, comandaId, onItemAdded }: Add
             />
           </div>
 
-          <div className="max-h-[40dvh] lg:max-h-80 overflow-y-auto space-y-3 -mx-1 px-1">
+          <div className="space-y-3 -mx-1 px-1 pb-40 lg:pb-0">
             {Array.from(grouped.entries()).map(([categoria, prods]) => (
               <div key={categoria}>
                 <h3 className="font-heading text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 px-1">
