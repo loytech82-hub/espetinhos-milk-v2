@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, ClipboardList } from 'lucide-react'
+import { Plus, Search, ClipboardList, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
+import { cancelComanda } from '@/lib/supabase-helpers'
+import { useToast } from '@/lib/toast-context'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { EmptyState } from '@/components/ui/empty-state'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { NovaComandaModal } from '@/components/comandas/nova-comanda-modal'
 import type { Comanda } from '@/lib/types'
 
@@ -15,11 +18,14 @@ type Filtro = (typeof filtros)[number]
 
 export default function ComandasPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [comandas, setComandas] = useState<Comanda[]>([])
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const [busca, setBusca] = useState('')
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Comanda | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   useEffect(() => {
     loadComandas()
@@ -64,6 +70,31 @@ export default function ComandasPage() {
     if (status === 'aberta') return 'success' as const
     if (status === 'fechada') return 'muted' as const
     return 'danger' as const
+  }
+
+  // Excluir pedido (cancelado/pago pode ser removido; aberto cancela primeiro)
+  async function handleDeleteComanda() {
+    if (!deleteTarget) return
+    setDeleteLoading(true)
+    try {
+      if (deleteTarget.status === 'aberta') {
+        await cancelComanda(deleteTarget.id)
+        toast(`Pedido #${deleteTarget.numero} cancelado`, 'warning')
+      } else {
+        // Deletar itens e depois a comanda
+        await supabase.from('caixa').delete().eq('comanda_id', deleteTarget.id)
+        await supabase.from('estoque_movimentos').delete().eq('comanda_id', deleteTarget.id)
+        await supabase.from('comanda_itens').delete().eq('comanda_id', deleteTarget.id)
+        await supabase.from('comandas').delete().eq('id', deleteTarget.id)
+        toast(`Pedido #${deleteTarget.numero} excluido`, 'success')
+      }
+      setDeleteTarget(null)
+      loadComandas()
+    } catch (err: unknown) {
+      toast((err as Error).message, 'error')
+    } finally {
+      setDeleteLoading(false)
+    }
   }
 
   const statusLabels: Record<string, string> = {
@@ -128,24 +159,24 @@ export default function ComandasPage() {
         />
       ) : (
         <div className="rounded-2xl overflow-hidden">
-          <div className="hidden sm:grid grid-cols-5 h-11 px-5 bg-bg-card items-center">
+          <div className="hidden sm:grid grid-cols-6 h-11 px-5 bg-bg-card items-center">
             <span className="text-xs text-text-muted">Pedido</span>
             <span className="text-xs text-text-muted">Tipo</span>
             <span className="text-xs text-text-muted">Cliente</span>
             <span className="text-xs text-text-muted">Valor</span>
             <span className="text-xs text-text-muted">Status</span>
+            <span className="text-xs text-text-muted text-right">Acao</span>
           </div>
 
           <div className="space-y-px">
             {filtered.map((comanda) => (
-              <a
+              <div
                 key={comanda.id}
-                href={`/comandas/${comanda.id}`}
-                className="grid grid-cols-2 sm:grid-cols-5 gap-2 px-5 py-4 sm:h-14 bg-bg-card items-center hover:bg-bg-elevated transition-colors cursor-pointer"
+                className="grid grid-cols-[1fr_1fr_auto] sm:grid-cols-6 gap-2 px-5 py-4 sm:h-14 bg-bg-card items-center hover:bg-bg-elevated transition-colors"
               >
-                <span className="font-mono text-[13px] text-text-white font-semibold">
+                <a href={`/comandas/${comanda.id}`} className="font-mono text-[13px] text-text-white font-semibold cursor-pointer hover:text-orange">
                   #{String(comanda.numero).padStart(3, '0')}
-                </span>
+                </a>
                 <div>
                   <StatusBadge variant={tipoBadgeVariant(comanda.tipo)} dot>
                     {comanda.tipo === 'mesa' ? 'Mesa' : comanda.tipo === 'balcao' ? 'Balcao' : 'Delivery'}
@@ -154,15 +185,25 @@ export default function ComandasPage() {
                 <span className="hidden sm:block text-[13px] text-text-white truncate">
                   {comanda.cliente_nome || '—'}
                 </span>
-                <span className="font-heading text-[13px] text-text-white font-bold">
+                <span className="hidden sm:block font-heading text-[13px] text-text-white font-bold">
                   {formatCurrency(comanda.total || 0)}
                 </span>
-                <div>
+                <div className="hidden sm:block">
                   <StatusBadge variant={statusBadgeVariant(comanda.status)}>
                     {statusLabels[comanda.status] || comanda.status}
                   </StatusBadge>
                 </div>
-              </a>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); setDeleteTarget(comanda) }}
+                    title={comanda.status === 'aberta' ? 'Cancelar pedido' : 'Excluir pedido'}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         </div>
@@ -172,6 +213,21 @@ export default function ComandasPage() {
         open={modalOpen}
         onOpenChange={setModalOpen}
         onCreated={(id) => router.push(`/comandas/${id}`)}
+      />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
+        title={deleteTarget?.status === 'aberta' ? 'Cancelar Pedido' : 'Excluir Pedido'}
+        description={
+          deleteTarget?.status === 'aberta'
+            ? `Cancelar pedido #${deleteTarget?.numero}? Os itens serao devolvidos ao estoque.`
+            : `Excluir pedido #${deleteTarget?.numero}? Esta acao nao pode ser desfeita.`
+        }
+        onConfirm={handleDeleteComanda}
+        loading={deleteLoading}
+        confirmText={deleteTarget?.status === 'aberta' ? 'Sim, Cancelar' : 'Sim, Excluir'}
+        variant="danger"
       />
     </div>
   )

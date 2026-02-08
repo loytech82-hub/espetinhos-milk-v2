@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { X, Plus, Minus, Trash2, CreditCard, Search, Package, XCircle, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { createComanda, addItemToComanda, removeItemFromComanda, closeComanda, cancelComanda } from '@/lib/supabase-helpers'
+import { createComanda, addItemToComanda, removeItemFromComanda, closeComanda, cancelComanda, deleteMesa, updateMesaStatus } from '@/lib/supabase-helpers'
 import { formatCurrency } from '@/lib/utils'
 import { useToast } from '@/lib/toast-context'
 import { Button } from '@/components/ui/button'
@@ -49,6 +49,13 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
 
+  // Excluir mesa
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+
+  // Mesa ocupada sem comanda
+  const [semComanda, setSemComanda] = useState(false)
+
   // Carregar comanda se mesa ocupada
   useEffect(() => {
     if (mesa.status === 'ocupada') {
@@ -92,8 +99,13 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
           .eq('comanda_id', comandaData.id)
           .order('created_at', { ascending: true })
         if (itensData) setItens(itensData)
+      } else {
+        // Mesa marcada como ocupada mas sem comanda aberta
+        setSemComanda(true)
       }
     } catch (error) {
+      // Nenhuma comanda encontrada — mesa travada
+      setSemComanda(true)
       console.error('Erro ao carregar pedido:', error)
     } finally {
       setLoading(false)
@@ -199,6 +211,34 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
     }
   }
 
+  // Excluir mesa
+  async function handleDeleteMesa() {
+    setDeleteLoading(true)
+    try {
+      await deleteMesa(mesa.id)
+      toast(`Mesa ${mesa.numero} excluida`, 'success')
+      setDeleteOpen(false)
+      onMesaUpdated()
+      onClose()
+    } catch (err: unknown) {
+      toast((err as Error).message, 'error')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  // Liberar mesa travada (ocupada sem comanda)
+  async function handleLiberarMesa() {
+    try {
+      await updateMesaStatus(mesa.id, 'livre')
+      toast(`Mesa ${mesa.numero} liberada`, 'success')
+      onMesaUpdated()
+      onClose()
+    } catch (err: unknown) {
+      toast((err as Error).message, 'error')
+    }
+  }
+
   // Filtrar produtos
   const filtered = useMemo(() => {
     if (!busca.trim()) return produtos
@@ -251,6 +291,30 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
             <div className="flex items-center justify-center py-20">
               <span className="text-text-muted">carregando...</span>
             </div>
+          ) : semComanda ? (
+            // ====== MESA OCUPADA SEM COMANDA: Liberar ou Excluir ======
+            <div className="p-5 space-y-6">
+              <div className="text-center py-6">
+                <div className="w-16 h-16 mx-auto bg-warning/10 rounded-2xl flex items-center justify-center mb-3">
+                  <XCircle className="w-8 h-8 text-warning" />
+                </div>
+                <h3 className="font-heading text-lg font-bold">Mesa Travada</h3>
+                <p className="text-sm text-text-muted mt-1">Esta mesa esta marcada como ocupada mas nao tem pedido aberto.</p>
+              </div>
+
+              <Button onClick={handleLiberarMesa} variant="success" className="w-full h-14 text-lg">
+                Liberar Mesa
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(true)}
+                className="w-full text-center text-sm text-danger hover:underline cursor-pointer py-2"
+              >
+                <Trash2 size={14} className="inline mr-1" />
+                Excluir Mesa
+              </button>
+            </div>
           ) : mode === 'novo' ? (
             // ====== MODO NOVO: Nome do cliente + Abrir Pedido ======
             <div className="p-5 space-y-6">
@@ -272,6 +336,15 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
               <Button onClick={handleCriarPedido} loading={criarLoading} variant="success" className="w-full h-14 text-lg">
                 Abrir Pedido
               </Button>
+
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(true)}
+                className="w-full text-center text-sm text-danger hover:underline cursor-pointer py-2"
+              >
+                <Trash2 size={14} className="inline mr-1" />
+                Excluir Mesa
+              </button>
             </div>
           ) : mode === 'adicionar' ? (
             // ====== MODO ADICIONAR: Buscar e selecionar produtos ======
@@ -287,7 +360,6 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
                       onChange={e => setBusca(e.target.value)}
                       placeholder="Buscar produto..."
                       className="w-full bg-bg-elevated border border-bg-placeholder rounded-lg pl-10 pr-4 py-2.5 text-text-white placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-orange/50"
-                      autoFocus
                     />
                   </div>
 
@@ -358,7 +430,10 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
                       <span className="font-heading text-2xl font-bold w-12 text-center">{quantidade}</span>
                       <button
                         type="button"
-                        onClick={() => setQuantidade(Math.min(produtoSelecionado.estoque_atual || 0, quantidade + 1))}
+                        onClick={() => {
+                          const max = produtoSelecionado.controlar_estoque ? (produtoSelecionado.estoque_atual || 0) : 999
+                          setQuantidade(Math.min(max, quantidade + 1))
+                        }}
                         className="w-10 h-10 flex items-center justify-center rounded-lg bg-bg-elevated hover:bg-bg-placeholder transition-colors"
                       >
                         <Plus size={16} />
@@ -512,6 +587,18 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
         onConfirm={handleCancel}
         loading={cancelLoading}
         confirmText="Sim, Cancelar"
+        variant="danger"
+      />
+
+      {/* Confirmacao de exclusao de mesa */}
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Excluir Mesa"
+        description={`Tem certeza que deseja excluir a Mesa ${mesa.numero}? Esta acao nao pode ser desfeita.`}
+        onConfirm={handleDeleteMesa}
+        loading={deleteLoading}
+        confirmText="Sim, Excluir"
         variant="danger"
       />
     </>

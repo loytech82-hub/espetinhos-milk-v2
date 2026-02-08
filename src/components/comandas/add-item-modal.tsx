@@ -104,11 +104,10 @@ export function AddItemModal({ open, onOpenChange, comandaId, onItemAdded }: Add
               onChange={e => setBusca(e.target.value)}
               placeholder="Buscar produto..."
               className="w-full bg-bg-elevated border border-bg-placeholder rounded-lg pl-10 pr-4 py-2.5 text-text-white placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-orange/50"
-              autoFocus
             />
           </div>
 
-          <div className="max-h-[50dvh] lg:max-h-80 overflow-y-auto space-y-4">
+          <div className="max-h-[40dvh] lg:max-h-80 overflow-y-auto space-y-3 -mx-1 px-1">
             {Array.from(grouped.entries()).map(([categoria, prods]) => (
               <div key={categoria}>
                 <h3 className="font-heading text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 px-1">
