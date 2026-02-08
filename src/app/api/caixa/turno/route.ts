@@ -1,11 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
 import { supabaseAdmin } from '@/lib/supabase-server'
+
+// Extrair usuario logado dos cookies
+async function getAuthUserId(request: NextRequest): Promise<string | null> {
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll() {},
+      },
+    }
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+  return user?.id || null
+}
 
 // POST /api/caixa/turno — Abrir turno do caixa
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { valor_abertura, observacao } = body
+
+    // Buscar usuario logado
+    const userId = await getAuthUserId(request)
 
     // Verificar se ja existe turno aberto
     const { data: turnoExistente } = await supabaseAdmin
@@ -27,6 +49,7 @@ export async function POST(request: NextRequest) {
         valor_abertura,
         observacao_abertura: observacao || null,
         status: 'aberto',
+        usuario_id: userId,
       })
       .select()
       .single()
