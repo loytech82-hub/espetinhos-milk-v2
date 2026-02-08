@@ -17,6 +17,8 @@ export async function POST(request: NextRequest) {
         return await handleUpdateProduto(params)
       case 'toggleProdutoAtivo':
         return await handleToggleProdutoAtivo(params)
+      case 'deleteProduto':
+        return await handleDeleteProduto(params)
       case 'createCliente':
         return await handleCreateCliente(params)
       case 'updateCliente':
@@ -191,6 +193,32 @@ async function handleToggleProdutoAtivo(params: { id: string; ativo: boolean }) 
   const { error } = await supabaseAdmin
     .from('produtos')
     .update({ ativo: params.ativo })
+    .eq('id', params.id)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ result: true })
+}
+
+async function handleDeleteProduto(params: { id: string }) {
+  // Buscar produto para deletar foto do storage se houver
+  const { data: produto } = await supabaseAdmin
+    .from('produtos')
+    .select('foto_url')
+    .eq('id', params.id)
+    .single()
+
+  // Deletar foto do storage se existir
+  if (produto?.foto_url) {
+    const parts = produto.foto_url.split('/')
+    const fileName = parts[parts.length - 1]
+    if (fileName) {
+      await supabaseAdmin.storage.from('produtos').remove([fileName])
+    }
+  }
+
+  const { error } = await supabaseAdmin
+    .from('produtos')
+    .delete()
     .eq('id', params.id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

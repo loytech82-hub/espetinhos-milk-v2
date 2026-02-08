@@ -158,9 +158,18 @@ export default function ProdutosPage() {
                 onClick={() => handleEdit(produto)}
                 className="grid grid-cols-2 sm:grid-cols-5 gap-2 px-5 py-4 sm:h-14 bg-bg-card items-center hover:bg-bg-elevated transition-colors cursor-pointer"
               >
-                <span className="text-[13px] text-text-white font-medium">
-                  {produto.nome}
-                </span>
+                <div className="flex items-center gap-3">
+                  {produto.foto_url ? (
+                    <img src={produto.foto_url} alt={produto.nome} className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-lg bg-bg-elevated flex items-center justify-center shrink-0">
+                      <Package size={16} className="text-text-muted" />
+                    </div>
+                  )}
+                  <span className="text-[13px] text-text-white font-medium">
+                    {produto.nome}
+                  </span>
+                </div>
                 <span className="text-[13px] text-text-muted">
                   {produto.categoria}
                 </span>

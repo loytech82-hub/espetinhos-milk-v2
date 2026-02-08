@@ -90,6 +90,10 @@ export async function toggleProdutoAtivo(id: string, ativo: boolean): Promise<vo
   await apiCall('toggleProdutoAtivo', { id, ativo })
 }
 
+export async function deleteProduto(id: string): Promise<void> {
+  await apiCall('deleteProduto', { id })
+}
+
 // ============================================
 // CLIENTES
 // ============================================

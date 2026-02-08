@@ -41,6 +41,7 @@ export interface Produto {
   nome: string
   preco: number
   categoria: string
+  foto_url: string | null
   estoque_atual: number | null
   estoque_minimo: number
   controlar_estoque: boolean

@@ -122,9 +122,13 @@ export function AddItemModal({ open, onOpenChange, comandaId, onItemAdded }: Add
                       className="w-full flex items-center justify-between px-4 py-3 rounded-lg bg-bg-elevated hover:bg-bg-placeholder transition-colors text-left"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-bg-placeholder flex items-center justify-center shrink-0">
-                          <Package size={16} className="text-text-muted" />
-                        </div>
+                        {p.foto_url ? (
+                          <img src={p.foto_url} alt={p.nome} className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-bg-placeholder flex items-center justify-center shrink-0">
+                            <Package size={16} className="text-text-muted" />
+                          </div>
+                        )}
                         <div>
                           <span className="text-sm text-text-white font-medium">{p.nome}</span>
                           <span className="text-xs text-text-muted block">Estoque: {p.estoque_atual || 0}</span>
