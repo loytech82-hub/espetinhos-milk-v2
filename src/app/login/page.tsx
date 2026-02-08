@@ -65,7 +65,7 @@ export default function LoginPage() {
     setSuccess('')
 
     try {
-      const { error: authError } = await supabase.auth.signUp({
+      const { data: signUpData, error: authError } = await supabase.auth.signUp({
         email,
         password: senha,
         options: {
@@ -84,7 +84,26 @@ export default function LoginPage() {
         return
       }
 
-      setSuccess('Conta criada! Verifique seu email para confirmar o cadastro.')
+      // Se a sessao ja veio, entra direto
+      if (signUpData?.session) {
+        router.push('/')
+        router.refresh()
+        return
+      }
+
+      // Sessao nao veio — faz login automatico apos cadastro
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email,
+        password: senha,
+      })
+      if (!loginError) {
+        router.push('/')
+        router.refresh()
+        return
+      }
+
+      // Se nem assim funcionou, mostra sucesso generico
+      setSuccess('Conta criada! Faca login para continuar.')
       setSenha('')
     } catch {
       setError('Erro ao criar conta. Tente novamente.')
@@ -266,7 +285,7 @@ export default function LoginPage() {
             </button>
 
             <p className="font-mono text-[11px] text-[#555] text-center">
-              Ao criar sua conta, um email de confirmacao sera enviado.
+              Ao criar sua conta, voce ja entra no sistema.
             </p>
           </form>
         )}
