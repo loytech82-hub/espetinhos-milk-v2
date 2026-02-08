@@ -104,7 +104,7 @@ export default function ComandaDetalhePage() {
 
   const subtotalItens = itens.reduce((acc, i) => acc + i.subtotal, 0)
   const isAberta = comanda.status === 'aberta'
-  // Se fechada, usa total salvo (ja inclui taxa/desconto). Se aberta, usa subtotal dos itens.
+  // Se fechada, usa total salvo (ja inclui desconto). Se aberta, usa subtotal dos itens.
   const totalExibicao = isAberta ? subtotalItens : (comanda.total || 0)
 
   const statusLabels: Record<string, string> = {
@@ -227,12 +227,6 @@ export default function ComandaDetalhePage() {
             <span className="text-sm text-text-muted">Subtotal</span>
             <span className="text-sm text-text-white">{formatCurrency(subtotalItens)}</span>
           </div>
-          {(comanda.taxa_servico ?? 0) > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-text-muted">Taxa de servico (10%)</span>
-              <span className="text-sm text-success">+{formatCurrency(comanda.taxa_servico)}</span>
-            </div>
-          )}
           {(comanda.desconto ?? 0) > 0 && (
             <div className="flex items-center justify-between">
               <span className="text-sm text-text-muted">Desconto</span>

@@ -169,7 +169,6 @@ async function recalcularTotalComanda(comandaId: string): Promise<void> {
 export async function closeComanda(
   comandaId: string,
   formaPagamento: string,
-  taxaServico?: number,
   desconto?: number
 ): Promise<void> {
   // Buscar comanda
@@ -182,10 +181,9 @@ export async function closeComanda(
   if (!comanda) throw new Error('Comanda não encontrada')
   if (comanda.status !== 'aberta') throw new Error('Comanda já está fechada')
 
-  // Calcular total final com taxa e desconto
-  const taxa = taxaServico ?? 0
+  // Calcular total final com desconto
   const desc = desconto ?? 0
-  const totalFinal = comanda.total + taxa - desc
+  const totalFinal = comanda.total - desc
 
   // Fechar comanda
   const { error } = await supabase
@@ -193,7 +191,7 @@ export async function closeComanda(
     .update({
       status: 'fechada',
       forma_pagamento: formaPagamento,
-      taxa_servico: taxa,
+      taxa_servico: 0,
       desconto: desc,
       total: totalFinal,
       fechada_em: new Date().toISOString(),

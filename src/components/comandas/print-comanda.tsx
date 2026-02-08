@@ -13,7 +13,6 @@ interface PrintComandaProps {
 // Usa window.print() com CSS @media print
 export function printComanda(comanda: Comanda, itens: ComandaItem[], empresaNome = 'Espetinhos 1000K') {
   const subtotal = itens.reduce((acc, i) => acc + i.subtotal, 0)
-  const taxa = comanda.taxa_servico || 0
   const desconto = comanda.desconto || 0
   const total = comanda.status === 'fechada' ? (comanda.total || 0) : subtotal
 
@@ -109,12 +108,6 @@ export function printComanda(comanda: Comanda, itens: ComandaItem[], empresaNome
       <span>Subtotal</span>
       <span>${formatCurrency(subtotal)}</span>
     </div>
-    ${taxa > 0 ? `
-    <div class="row">
-      <span>Taxa 10%</span>
-      <span>+${formatCurrency(taxa)}</span>
-    </div>
-    ` : ''}
     ${desconto > 0 ? `
     <div class="row">
       <span>Desconto</span>

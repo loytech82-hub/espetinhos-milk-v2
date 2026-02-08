@@ -29,7 +29,6 @@ export function FecharComandaModal({ open, onOpenChange, comandaId, subtotal, on
   const [formaPagamento, setFormaPagamento] = useState('pix')
   const [valorRecebido, setValorRecebido] = useState('')
   const [loading, setLoading] = useState(false)
-  const [comTaxa, setComTaxa] = useState(true)
   const [descontoStr, setDescontoStr] = useState('')
 
   // Reset ao fechar
@@ -37,14 +36,12 @@ export function FecharComandaModal({ open, onOpenChange, comandaId, subtotal, on
     if (!open) {
       setFormaPagamento('pix')
       setValorRecebido('')
-      setComTaxa(true)
       setDescontoStr('')
     }
   }, [open])
 
-  const taxaServico = comTaxa ? Math.round(subtotal * 0.1 * 100) / 100 : 0
   const desconto = parseFloat(descontoStr) || 0
-  const totalFinal = subtotal + taxaServico - desconto
+  const totalFinal = subtotal - desconto
 
   const troco = formaPagamento === 'dinheiro' && valorRecebido
     ? Math.max(0, parseFloat(valorRecebido) - totalFinal)
@@ -66,7 +63,7 @@ export function FecharComandaModal({ open, onOpenChange, comandaId, subtotal, on
 
     setLoading(true)
     try {
-      await closeComanda(comandaId, formaPagamento, taxaServico, desconto)
+      await closeComanda(comandaId, formaPagamento, desconto)
       toast('Pagamento recebido!', 'success')
       onOpenChange(false)
       onClosed()
@@ -87,23 +84,6 @@ export function FecharComandaModal({ open, onOpenChange, comandaId, subtotal, on
             <span className="text-sm text-text-white">{formatCurrency(subtotal)}</span>
           </div>
 
-          {/* Toggle taxa de servico */}
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setComTaxa(!comTaxa)}
-              className="flex items-center gap-2 text-sm cursor-pointer"
-            >
-              <div className={`relative w-9 h-5 rounded-full transition-colors ${comTaxa ? 'bg-orange' : 'bg-bg-placeholder'}`}>
-                <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${comTaxa ? 'left-[18px]' : 'left-[2px]'}`} />
-              </div>
-              <span className="text-text-muted">Taxa 10%</span>
-            </button>
-            <span className={`text-sm ${comTaxa ? 'text-success' : 'text-text-muted'}`}>
-              {comTaxa ? `+${formatCurrency(taxaServico)}` : 'R$ 0,00'}
-            </span>
-          </div>
-
           {/* Desconto */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -114,7 +94,7 @@ export function FecharComandaModal({ open, onOpenChange, comandaId, subtotal, on
               type="number"
               step="0.01"
               min="0"
-              max={subtotal + taxaServico}
+              max={subtotal}
               value={descontoStr}
               onChange={e => setDescontoStr(e.target.value)}
               placeholder="0,00"

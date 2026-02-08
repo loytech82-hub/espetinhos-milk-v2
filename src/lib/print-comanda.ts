@@ -11,7 +11,6 @@ export function printComanda(
   empresaNome?: string
 ) {
   const subtotal = itens.reduce((acc, i) => acc + i.subtotal, 0)
-  const taxa = comanda.taxa_servico || 0
   const desconto = comanda.desconto || 0
   const total = comanda.total || subtotal
 
@@ -110,7 +109,6 @@ export function printComanda(
       <td>Subtotal</td>
       <td class="right">${formatCurrency(subtotal)}</td>
     </tr>
-    ${taxa > 0 ? `<tr><td>Taxa 10%</td><td class="right">+${formatCurrency(taxa)}</td></tr>` : ''}
     ${desconto > 0 ? `<tr><td>Desconto</td><td class="right">-${formatCurrency(desconto)}</td></tr>` : ''}
     <tr><td colspan="2"><div class="line"></div></td></tr>
     <tr class="total-row">
