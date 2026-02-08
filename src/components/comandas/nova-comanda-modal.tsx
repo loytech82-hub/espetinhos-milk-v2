@@ -13,7 +13,7 @@ import { UtensilsCrossed, Store, Truck } from 'lucide-react'
 interface NovaComandaModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreated: (id: number) => void
+  onCreated: (id: string) => void
   defaultMesaId?: number | null
 }
 

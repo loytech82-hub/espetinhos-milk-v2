@@ -48,8 +48,8 @@ export async function createComanda(
 
 // Adicionar item à comanda
 export async function addItemToComanda(
-  comandaId: number,
-  produtoId: number,
+  comandaId: string,
+  produtoId: string,
   quantidade: number,
   observacao?: string | null
 ): Promise<ComandaItem> {
@@ -61,7 +61,11 @@ export async function addItemToComanda(
     .single()
 
   if (prodError || !produto) throw new Error('Produto não encontrado')
-  if (produto.estoque < quantidade) throw new Error(`Estoque insuficiente (disponível: ${produto.estoque})`)
+
+  // So validar estoque se controlar_estoque = true
+  if (produto.controlar_estoque && (produto.estoque_atual || 0) < quantidade) {
+    throw new Error(`Estoque insuficiente (disponível: ${produto.estoque_atual || 0})`)
+  }
 
   const subtotal = produto.preco * quantidade
 
@@ -81,23 +85,25 @@ export async function addItemToComanda(
 
   if (error) throw new Error(`Erro ao adicionar item: ${error.message}`)
 
-  // Decrementar estoque
-  const novoEstoque = produto.estoque - quantidade
-  await supabase
-    .from('produtos')
-    .update({ estoque: novoEstoque })
-    .eq('id', produtoId)
+  // Decrementar estoque somente se controlar_estoque = true
+  if (produto.controlar_estoque) {
+    const novoEstoque = (produto.estoque_atual || 0) - quantidade
+    await supabase
+      .from('produtos')
+      .update({ estoque_atual: novoEstoque })
+      .eq('id', produtoId)
 
-  // Registrar movimentacao de estoque
-  await registrarMovimentoEstoque({
-    produto_id: produtoId,
-    tipo: 'venda',
-    quantidade,
-    estoque_anterior: produto.estoque,
-    estoque_posterior: novoEstoque,
-    motivo: `Comanda #${comandaId}`,
-    comanda_id: comandaId,
-  })
+    // Registrar movimentacao de estoque
+    await registrarMovimentoEstoque({
+      produto_id: produtoId,
+      tipo: 'venda',
+      quantidade,
+      estoque_anterior: produto.estoque_atual || 0,
+      estoque_posterior: novoEstoque,
+      motivo: `Comanda #${comandaId}`,
+      comanda_id: comandaId,
+    })
+  }
 
   // Recalcular total da comanda
   await recalcularTotalComanda(comandaId)
@@ -107,8 +113,8 @@ export async function addItemToComanda(
 
 // Remover item da comanda
 export async function removeItemFromComanda(
-  itemId: number,
-  comandaId: number
+  itemId: string,
+  comandaId: string
 ): Promise<void> {
   // Buscar item para restaurar estoque
   const { data: item } = await supabase
@@ -123,12 +129,12 @@ export async function removeItemFromComanda(
   const { error } = await supabase.from('comanda_itens').delete().eq('id', itemId)
   if (error) throw new Error(`Erro ao remover item: ${error.message}`)
 
-  // Restaurar estoque
-  if (item.produto) {
-    const novoEstoque = item.produto.estoque + item.quantidade
+  // Restaurar estoque somente se controlar_estoque = true
+  if (item.produto && item.produto.controlar_estoque) {
+    const novoEstoque = (item.produto.estoque_atual || 0) + item.quantidade
     await supabase
       .from('produtos')
-      .update({ estoque: novoEstoque })
+      .update({ estoque_atual: novoEstoque })
       .eq('id', item.produto_id)
 
     // Registrar movimentacao de estoque
@@ -136,7 +142,7 @@ export async function removeItemFromComanda(
       produto_id: item.produto_id,
       tipo: 'cancelamento',
       quantidade: item.quantidade,
-      estoque_anterior: item.produto.estoque,
+      estoque_anterior: item.produto.estoque_atual || 0,
       estoque_posterior: novoEstoque,
       motivo: `Item removido da comanda #${comandaId}`,
       comanda_id: comandaId,
@@ -148,7 +154,7 @@ export async function removeItemFromComanda(
 }
 
 // Recalcular total da comanda
-async function recalcularTotalComanda(comandaId: number): Promise<void> {
+async function recalcularTotalComanda(comandaId: string): Promise<void> {
   const { data: itens } = await supabase
     .from('comanda_itens')
     .select('subtotal')
@@ -161,8 +167,10 @@ async function recalcularTotalComanda(comandaId: number): Promise<void> {
 
 // Fechar comanda
 export async function closeComanda(
-  comandaId: number,
-  formaPagamento: string
+  comandaId: string,
+  formaPagamento: string,
+  taxaServico?: number,
+  desconto?: number
 ): Promise<void> {
   // Buscar comanda
   const { data: comanda } = await supabase
@@ -174,13 +182,21 @@ export async function closeComanda(
   if (!comanda) throw new Error('Comanda não encontrada')
   if (comanda.status !== 'aberta') throw new Error('Comanda já está fechada')
 
+  // Calcular total final com taxa e desconto
+  const taxa = taxaServico ?? 0
+  const desc = desconto ?? 0
+  const totalFinal = comanda.total + taxa - desc
+
   // Fechar comanda
   const { error } = await supabase
     .from('comandas')
     .update({
       status: 'fechada',
       forma_pagamento: formaPagamento,
-      closed_at: new Date().toISOString(),
+      taxa_servico: taxa,
+      desconto: desc,
+      total: totalFinal,
+      fechada_em: new Date().toISOString(),
     })
     .eq('id', comandaId)
 
@@ -192,7 +208,7 @@ export async function closeComanda(
   // Registrar entrada no caixa
   await supabase.from('caixa').insert({
     tipo: 'entrada',
-    valor: comanda.total,
+    valor: totalFinal,
     descricao: `Comanda #${comanda.numero} (${comanda.tipo})`,
     forma_pagamento: formaPagamento,
     comanda_id: comandaId,
@@ -206,28 +222,28 @@ export async function closeComanda(
 }
 
 // Cancelar comanda
-export async function cancelComanda(comandaId: number): Promise<void> {
+export async function cancelComanda(comandaId: string): Promise<void> {
   // Buscar itens para restaurar estoque
   const { data: itens } = await supabase
     .from('comanda_itens')
     .select('*, produto:produtos(*)')
     .eq('comanda_id', comandaId)
 
-  // Restaurar estoque de cada item
+  // Restaurar estoque de cada item (somente se controlar_estoque = true)
   if (itens) {
     for (const item of itens) {
-      if (item.produto) {
-        const novoEstoque = item.produto.estoque + item.quantidade
+      if (item.produto && item.produto.controlar_estoque) {
+        const novoEstoque = (item.produto.estoque_atual || 0) + item.quantidade
         await supabase
           .from('produtos')
-          .update({ estoque: novoEstoque })
+          .update({ estoque_atual: novoEstoque })
           .eq('id', item.produto_id)
 
         await registrarMovimentoEstoque({
           produto_id: item.produto_id,
           tipo: 'cancelamento',
           quantidade: item.quantidade,
-          estoque_anterior: item.produto.estoque,
+          estoque_anterior: item.produto.estoque_atual || 0,
           estoque_posterior: novoEstoque,
           motivo: `Comanda #${comandaId} cancelada`,
           comanda_id: comandaId,
@@ -246,7 +262,7 @@ export async function cancelComanda(comandaId: number): Promise<void> {
   // Cancelar comanda
   await supabase
     .from('comandas')
-    .update({ status: 'cancelada', closed_at: new Date().toISOString() })
+    .update({ status: 'cancelada', fechada_em: new Date().toISOString() })
     .eq('id', comandaId)
 
   // Liberar mesa
@@ -270,7 +286,7 @@ export async function createProduto(produto: Omit<Produto, 'id' | 'created_at'>)
   return data
 }
 
-export async function updateProduto(id: number, updates: Partial<Produto>): Promise<Produto> {
+export async function updateProduto(id: string, updates: Partial<Produto>): Promise<Produto> {
   const { data, error } = await supabase
     .from('produtos')
     .update(updates)
@@ -282,7 +298,7 @@ export async function updateProduto(id: number, updates: Partial<Produto>): Prom
   return data
 }
 
-export async function toggleProdutoAtivo(id: number, ativo: boolean): Promise<void> {
+export async function toggleProdutoAtivo(id: string, ativo: boolean): Promise<void> {
   const { error } = await supabase.from('produtos').update({ ativo }).eq('id', id)
   if (error) throw new Error(`Erro ao alterar status: ${error.message}`)
 }
@@ -302,7 +318,7 @@ export async function createCliente(cliente: { nome: string; telefone?: string; 
   return data
 }
 
-export async function updateCliente(id: number, updates: Partial<Cliente>): Promise<Cliente> {
+export async function updateCliente(id: string, updates: Partial<Cliente>): Promise<Cliente> {
   const { data, error } = await supabase
     .from('clientes')
     .update(updates)
@@ -455,14 +471,17 @@ export async function fecharTurno(
 
 // Registrar movimentacao de estoque
 export async function registrarMovimentoEstoque(params: {
-  produto_id: number
+  produto_id: string
   tipo: 'entrada' | 'saida' | 'ajuste' | 'venda' | 'cancelamento'
   quantidade: number
   estoque_anterior: number
   estoque_posterior: number
   motivo?: string
-  comanda_id?: number
+  comanda_id?: string
 }): Promise<void> {
+  // Pegar usuario logado para auditoria
+  const { data: { user } } = await supabase.auth.getUser()
+
   await supabase.from('estoque_movimentos').insert({
     produto_id: params.produto_id,
     tipo: params.tipo,
@@ -471,30 +490,31 @@ export async function registrarMovimentoEstoque(params: {
     estoque_posterior: params.estoque_posterior,
     motivo: params.motivo || null,
     comanda_id: params.comanda_id || null,
+    usuario_id: user?.id || null,
   })
 }
 
 // Entrada de estoque (compra de mercadoria)
 export async function entradaEstoque(
-  produtoId: number,
+  produtoId: string,
   quantidade: number,
   motivo?: string
 ): Promise<void> {
   // Buscar estoque atual
   const { data: produto } = await supabase
     .from('produtos')
-    .select('estoque')
+    .select('estoque_atual')
     .eq('id', produtoId)
     .single()
 
   if (!produto) throw new Error('Produto nao encontrado')
 
-  const novoEstoque = produto.estoque + quantidade
+  const novoEstoque = (produto.estoque_atual || 0) + quantidade
 
   // Atualizar estoque
   await supabase
     .from('produtos')
-    .update({ estoque: novoEstoque })
+    .update({ estoque_atual: novoEstoque })
     .eq('id', produtoId)
 
   // Registrar movimentacao
@@ -502,7 +522,7 @@ export async function entradaEstoque(
     produto_id: produtoId,
     tipo: 'entrada',
     quantidade,
-    estoque_anterior: produto.estoque,
+    estoque_anterior: produto.estoque_atual || 0,
     estoque_posterior: novoEstoque,
     motivo: motivo || 'Entrada de mercadoria',
   })
@@ -510,25 +530,25 @@ export async function entradaEstoque(
 
 // Ajuste manual de estoque
 export async function ajusteEstoque(
-  produtoId: number,
+  produtoId: string,
   novaQuantidade: number,
   motivo: string
 ): Promise<void> {
   // Buscar estoque atual
   const { data: produto } = await supabase
     .from('produtos')
-    .select('estoque')
+    .select('estoque_atual')
     .eq('id', produtoId)
     .single()
 
   if (!produto) throw new Error('Produto nao encontrado')
 
-  const diferenca = Math.abs(novaQuantidade - produto.estoque)
+  const diferenca = Math.abs(novaQuantidade - (produto.estoque_atual || 0))
 
   // Atualizar estoque
   await supabase
     .from('produtos')
-    .update({ estoque: novaQuantidade })
+    .update({ estoque_atual: novaQuantidade })
     .eq('id', produtoId)
 
   // Registrar movimentacao
@@ -536,7 +556,7 @@ export async function ajusteEstoque(
     produto_id: produtoId,
     tipo: 'ajuste',
     quantidade: diferenca,
-    estoque_anterior: produto.estoque,
+    estoque_anterior: produto.estoque_atual || 0,
     estoque_posterior: novaQuantidade,
     motivo,
   })
@@ -544,7 +564,7 @@ export async function ajusteEstoque(
 
 // Buscar movimentacoes de estoque
 export async function getMovimentosEstoque(filtros?: {
-  produto_id?: number
+  produto_id?: string
   tipo?: string
   data_inicio?: string
   data_fim?: string
@@ -577,11 +597,11 @@ export async function getProdutosEstoqueBaixo(): Promise<Produto[]> {
     .from('produtos')
     .select('*')
     .eq('ativo', true)
-    .filter('estoque', 'lte', 'estoque_minimo' as never)
+    .eq('controlar_estoque', true)
 
   // Filtrar no cliente (Supabase nao suporta comparar 2 colunas diretamente)
   if (!data) return []
-  return data.filter(p => p.estoque <= p.estoque_minimo) as Produto[]
+  return data.filter(p => (p.estoque_atual || 0) <= p.estoque_minimo) as Produto[]
 }
 
 // ============================================

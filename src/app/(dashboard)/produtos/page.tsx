@@ -50,7 +50,7 @@ export default function ProdutosPage() {
     return true
   })
 
-  const estoqueBaixo = produtos.filter((p) => p.estoque <= p.estoque_minimo && p.ativo)
+  const estoqueBaixo = produtos.filter((p) => (p.estoque_atual || 0) <= p.estoque_minimo && p.ativo)
 
   async function handleToggleAtivo(produto: Produto) {
     try {
@@ -163,10 +163,10 @@ export default function ProdutosPage() {
                 </span>
                 <div>
                   <StatusBadge
-                    variant={produto.estoque <= produto.estoque_minimo ? 'warning' : 'success'}
+                    variant={(produto.estoque_atual || 0) <= produto.estoque_minimo ? 'warning' : 'success'}
                     dot
                   >
-                    {produto.estoque} un.
+                    {produto.estoque_atual || 0} un.
                   </StatusBadge>
                 </div>
                 <div>

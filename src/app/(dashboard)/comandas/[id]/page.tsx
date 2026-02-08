@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Plus, Trash2, CreditCard, XCircle } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, CreditCard, XCircle, Printer } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { removeItemFromComanda, cancelComanda } from '@/lib/supabase-helpers'
@@ -12,12 +12,15 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { AddItemModal } from '@/components/comandas/add-item-modal'
 import { FecharComandaModal } from '@/components/comandas/fechar-comanda-modal'
+import { printComanda } from '@/lib/print-comanda'
+import { useEmpresa } from '@/lib/empresa-context'
 import type { Comanda, ComandaItem, Produto } from '@/lib/types'
 
 export default function ComandaDetalhePage() {
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
+  const { empresa } = useEmpresa()
   const [comanda, setComanda] = useState<Comanda | null>(null)
   const [itens, setItens] = useState<ComandaItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -26,7 +29,7 @@ export default function ComandaDetalhePage() {
   const [fecharOpen, setFecharOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
-  const [removingId, setRemovingId] = useState<number | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (params.id) loadComanda(params.id as string)
@@ -54,13 +57,13 @@ export default function ComandaDetalhePage() {
     }
   }
 
-  async function handleRemoveItem(itemId: number) {
+  async function handleRemoveItem(itemId: string) {
     if (!comanda) return
     setRemovingId(itemId)
     try {
       await removeItemFromComanda(itemId, comanda.id)
       toast('Item removido', 'success')
-      await loadComanda(String(comanda.id))
+      await loadComanda(comanda.id)
     } catch (err: unknown) {
       toast((err as Error).message, 'error')
     } finally {
@@ -99,8 +102,10 @@ export default function ComandaDetalhePage() {
     )
   }
 
-  const total = itens.reduce((acc, i) => acc + i.subtotal, 0)
+  const subtotalItens = itens.reduce((acc, i) => acc + i.subtotal, 0)
   const isAberta = comanda.status === 'aberta'
+  // Se fechada, usa total salvo (ja inclui taxa/desconto). Se aberta, usa subtotal dos itens.
+  const totalExibicao = isAberta ? subtotalItens : (comanda.total || 0)
 
   const statusLabels: Record<string, string> = {
     aberta: 'Aberto',
@@ -133,15 +138,25 @@ export default function ComandaDetalhePage() {
               {tipoLabels[comanda.tipo] || comanda.tipo}
             </StatusBadge>
             <span className="text-sm text-text-muted">
-              {new Date(comanda.created_at).toLocaleString('pt-BR')}
+              {new Date(comanda.aberta_em).toLocaleString('pt-BR')}
             </span>
           </div>
         </div>
-        <StatusBadge
-          variant={comanda.status === 'aberta' ? 'success' : comanda.status === 'fechada' ? 'muted' : 'danger'}
-        >
-          {statusLabels[comanda.status] || comanda.status}
-        </StatusBadge>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            title="Imprimir comanda"
+            onClick={() => printComanda(comanda, itens, empresa?.nome)}
+            className="w-10 h-10 flex items-center justify-center bg-bg-elevated rounded-2xl hover:bg-bg-placeholder transition-colors cursor-pointer"
+          >
+            <Printer className="w-4 h-4" />
+          </button>
+          <StatusBadge
+            variant={comanda.status === 'aberta' ? 'success' : comanda.status === 'fechada' ? 'muted' : 'danger'}
+          >
+            {statusLabels[comanda.status] || comanda.status}
+          </StatusBadge>
+        </div>
       </div>
 
       {/* Itens */}
@@ -164,13 +179,6 @@ export default function ComandaDetalhePage() {
               key={item.id}
               className="flex items-center justify-between gap-4 px-5 py-4 bg-bg-card"
             >
-              {(item.produto as unknown as Produto)?.imagem_url ? (
-                <img
-                  src={(item.produto as unknown as Produto).imagem_url!}
-                  alt=""
-                  className="w-10 h-10 rounded-lg object-cover shrink-0"
-                />
-              ) : null}
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] text-text-white font-medium">
                   {(item.produto as unknown as Produto)?.nome || 'Produto'}
@@ -213,37 +221,59 @@ export default function ComandaDetalhePage() {
       </div>
 
       {/* Total + Acoes */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 bg-bg-card rounded-2xl">
-        <div>
-          <span className="text-xs text-text-muted">Total</span>
-          <p className="font-heading text-3xl font-bold text-orange">
-            {formatCurrency(total)}
-          </p>
+      <div className="p-5 bg-bg-card rounded-2xl space-y-4">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-text-muted">Subtotal</span>
+            <span className="text-sm text-text-white">{formatCurrency(subtotalItens)}</span>
+          </div>
+          {(comanda.taxa_servico ?? 0) > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-text-muted">Taxa de servico (10%)</span>
+              <span className="text-sm text-success">+{formatCurrency(comanda.taxa_servico)}</span>
+            </div>
+          )}
+          {(comanda.desconto ?? 0) > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-text-muted">Desconto</span>
+              <span className="text-sm text-danger">-{formatCurrency(comanda.desconto)}</span>
+            </div>
+          )}
+          <div className="h-px bg-border" />
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-text-white">Total</span>
+            <span className="font-heading text-3xl font-bold text-orange">
+              {formatCurrency(totalExibicao)}
+            </span>
+          </div>
         </div>
-        {isAberta && (
-          <div className="flex gap-3">
-            <Button variant="danger" size="sm" onClick={() => setCancelOpen(true)}>
-              <XCircle size={16} />
-              Cancelar
-            </Button>
-            <Button onClick={() => setFecharOpen(true)} disabled={itens.length === 0}>
-              <CreditCard size={16} />
-              Receber Pagamento
-            </Button>
-          </div>
-        )}
-        {comanda.status === 'fechada' && comanda.forma_pagamento && (
-          <div className="text-right">
-            <span className="text-xs text-text-muted">Pago via</span>
-            <p className="font-heading text-lg font-semibold text-success capitalize">
-              {comanda.forma_pagamento === 'cartao_debito' ? 'Cartao Debito'
-                : comanda.forma_pagamento === 'cartao_credito' ? 'Cartao Credito'
-                  : comanda.forma_pagamento === 'pix' ? 'PIX'
-                    : comanda.forma_pagamento === 'dinheiro' ? 'Dinheiro'
-                      : comanda.forma_pagamento}
-            </p>
-          </div>
-        )}
+
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          {isAberta && (
+            <div className="flex gap-3">
+              <Button variant="danger" size="sm" onClick={() => setCancelOpen(true)}>
+                <XCircle size={16} />
+                Cancelar
+              </Button>
+              <Button onClick={() => setFecharOpen(true)} disabled={itens.length === 0}>
+                <CreditCard size={16} />
+                Receber Pagamento
+              </Button>
+            </div>
+          )}
+          {comanda.status === 'fechada' && comanda.forma_pagamento && (
+            <div className="text-right">
+              <span className="text-xs text-text-muted">Pago via</span>
+              <p className="font-heading text-lg font-semibold text-success capitalize">
+                {comanda.forma_pagamento === 'cartao_debito' ? 'Cartao Debito'
+                  : comanda.forma_pagamento === 'cartao_credito' ? 'Cartao Credito'
+                    : comanda.forma_pagamento === 'pix' ? 'PIX'
+                      : comanda.forma_pagamento === 'dinheiro' ? 'Dinheiro'
+                        : comanda.forma_pagamento}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Modais */}
@@ -251,15 +281,15 @@ export default function ComandaDetalhePage() {
         open={addItemOpen}
         onOpenChange={setAddItemOpen}
         comandaId={comanda.id}
-        onItemAdded={() => loadComanda(String(comanda.id))}
+        onItemAdded={() => loadComanda(comanda.id)}
       />
 
       <FecharComandaModal
         open={fecharOpen}
         onOpenChange={setFecharOpen}
         comandaId={comanda.id}
-        total={total}
-        onClosed={() => loadComanda(String(comanda.id))}
+        subtotal={subtotalItens}
+        onClosed={() => loadComanda(comanda.id)}
       />
 
       <ConfirmDialog

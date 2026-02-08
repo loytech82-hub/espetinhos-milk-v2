@@ -1,4 +1,5 @@
 // Tipos das tabelas do Supabase
+// IDs: mesas=number, demais=string (UUID)
 export interface Mesa {
   id: number
   numero: number
@@ -7,22 +8,26 @@ export interface Mesa {
 }
 
 export interface Comanda {
-  id: number
+  id: string
   numero: number
   tipo: 'mesa' | 'balcao' | 'delivery'
   mesa_id: number | null
   status: 'aberta' | 'fechada' | 'cancelada'
   total: number
+  desconto: number
+  taxa_servico: number
   forma_pagamento: 'dinheiro' | 'pix' | 'cartao_debito' | 'cartao_credito' | null
   cliente_nome: string | null
-  created_at: string
-  closed_at: string | null
+  cliente_id: string | null
+  usuario_id: string | null
+  aberta_em: string
+  fechada_em: string | null
 }
 
 export interface ComandaItem {
-  id: number
-  comanda_id: number
-  produto_id: number
+  id: string
+  comanda_id: string
+  produto_id: string
   quantidade: number
   preco_unitario: number
   subtotal: number
@@ -32,29 +37,30 @@ export interface ComandaItem {
 }
 
 export interface Produto {
-  id: number
+  id: string
   nome: string
   preco: number
   categoria: string
-  estoque: number
+  estoque_atual: number | null
   estoque_minimo: number
-  imagem_url: string | null
+  controlar_estoque: boolean
   ativo: boolean
   created_at: string
 }
 
 export interface CaixaMovimento {
-  id: number
+  id: string
   tipo: 'entrada' | 'saida'
   valor: number
   descricao: string
   forma_pagamento: string | null
-  comanda_id: number | null
+  comanda_id: string | null
+  turno_id: number | null
   created_at: string
 }
 
 export interface Cliente {
-  id: number
+  id: string
   nome: string
   telefone: string | null
   endereco: string | null
@@ -90,14 +96,14 @@ export interface CaixaTurno {
 
 export interface EstoqueMovimento {
   id: number
-  produto_id: number
+  produto_id: string
   tipo: 'entrada' | 'saida' | 'ajuste' | 'venda' | 'cancelamento'
   quantidade: number
   estoque_anterior: number
   estoque_posterior: number
   motivo: string | null
   usuario_id: string | null
-  comanda_id: number | null
+  comanda_id: string | null
   created_at: string
   produto?: Produto
 }

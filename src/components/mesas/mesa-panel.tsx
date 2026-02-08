@@ -42,7 +42,7 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
   const [addLoading, setAddLoading] = useState(false)
 
   // Remover item
-  const [removingId, setRemovingId] = useState<number | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
 
   // Fechar/cancelar
   const [fecharOpen, setFecharOpen] = useState(false)
@@ -154,7 +154,7 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
   }
 
   // Remover item
-  async function handleRemoveItem(itemId: number) {
+  async function handleRemoveItem(itemId: string) {
     if (!comanda) return
     setRemovingId(itemId)
     try {
@@ -306,16 +306,12 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
                               className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-bg-elevated hover:bg-bg-placeholder transition-colors text-left"
                             >
                               <div className="flex items-center gap-3">
-                                {p.imagem_url ? (
-                                  <img src={p.imagem_url} alt={p.nome} className="w-10 h-10 rounded-lg object-cover shrink-0" />
-                                ) : (
-                                  <div className="w-10 h-10 rounded-lg bg-bg-placeholder flex items-center justify-center shrink-0">
-                                    <Package size={16} className="text-text-muted" />
-                                  </div>
-                                )}
+                                <div className="w-10 h-10 rounded-lg bg-bg-placeholder flex items-center justify-center shrink-0">
+                                  <Package size={16} className="text-text-muted" />
+                                </div>
                                 <div>
                                   <span className="text-sm text-text-white font-medium">{p.nome}</span>
-                                  <span className="text-xs text-text-muted block">Estoque: {p.estoque}</span>
+                                  <span className="text-xs text-text-muted block">Estoque: {p.estoque_atual || 0}</span>
                                 </div>
                               </div>
                               <span className="font-heading font-bold text-orange">{formatCurrency(p.preco)}</span>
@@ -339,9 +335,6 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
                 // Detalhes do produto selecionado
                 <div className="space-y-4">
                   <div className="flex items-center gap-4 p-4 bg-bg-elevated rounded-xl">
-                    {produtoSelecionado.imagem_url ? (
-                      <img src={produtoSelecionado.imagem_url} alt={produtoSelecionado.nome} className="w-16 h-16 rounded-xl object-cover" />
-                    ) : null}
                     <div className="flex-1">
                       <h3 className="font-heading text-lg font-bold text-text-white">{produtoSelecionado.nome}</h3>
                       <p className="text-sm text-text-muted">{produtoSelecionado.categoria}</p>
@@ -365,7 +358,7 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
                       <span className="font-heading text-2xl font-bold w-12 text-center">{quantidade}</span>
                       <button
                         type="button"
-                        onClick={() => setQuantidade(Math.min(produtoSelecionado.estoque, quantidade + 1))}
+                        onClick={() => setQuantidade(Math.min(produtoSelecionado.estoque_atual || 0, quantidade + 1))}
                         className="w-10 h-10 flex items-center justify-center rounded-lg bg-bg-elevated hover:bg-bg-placeholder transition-colors"
                       >
                         <Plus size={16} />
@@ -433,13 +426,9 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
                   {itens.map(item => (
                     <div key={item.id} className="flex items-center justify-between gap-3 px-4 py-3 bg-bg-card">
                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                        {(item.produto as unknown as Produto)?.imagem_url ? (
-                          <img
-                            src={(item.produto as unknown as Produto).imagem_url!}
-                            alt=""
-                            className="w-8 h-8 rounded-lg object-cover shrink-0"
-                          />
-                        ) : null}
+                        <div className="w-8 h-8 rounded-lg bg-bg-placeholder flex items-center justify-center shrink-0">
+                          <Package size={12} className="text-text-muted" />
+                        </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] text-text-white font-medium truncate">
                             {(item.produto as unknown as Produto)?.nome || 'Produto'}
@@ -506,7 +495,7 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
           open={fecharOpen}
           onOpenChange={setFecharOpen}
           comandaId={comanda.id}
-          total={total}
+          subtotal={total}
           onClosed={() => {
             onMesaUpdated()
             onClose()

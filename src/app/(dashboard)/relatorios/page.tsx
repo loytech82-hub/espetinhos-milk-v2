@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Calendar } from 'lucide-react'
+import { Calendar, FileDown } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
+import { printRelatorio } from '@/lib/print-relatorio'
+import { useEmpresa } from '@/lib/empresa-context'
 
 type Periodo = 'hoje' | 'semana' | 'mes' | 'tudo'
 
@@ -37,6 +39,7 @@ const periodos: { value: Periodo; label: string }[] = [
 ]
 
 export default function RelatoriosPage() {
+  const { empresa } = useEmpresa()
   const [periodo, setPeriodo] = useState<Periodo>('hoje')
   const [resumo, setResumo] = useState<ResumoVendas>({
     totalVendas: 0,
@@ -60,19 +63,19 @@ export default function RelatoriosPage() {
         .from('comandas')
         .select('total, forma_pagamento')
         .eq('status', 'fechada')
-      if (dateFrom) query = query.gte('closed_at', dateFrom)
+      if (dateFrom) query = query.gte('fechada_em', dateFrom)
 
       const { data } = await query
 
       const itensQuery = supabase
         .from('comanda_itens')
-        .select('quantidade, subtotal, produto:produtos(nome), comanda:comandas(status, closed_at)')
+        .select('quantidade, subtotal, produto:produtos(nome), comanda:comandas(status, fechada_em)')
       const { data: itensData } = await itensQuery
 
       const itensFiltrados = (itensData || []).filter((item: Record<string, unknown>) => {
         const comanda = item.comanda as Record<string, unknown> | null
         if (!comanda || comanda.status !== 'fechada') return false
-        if (dateFrom && comanda.closed_at && String(comanda.closed_at) < dateFrom) return false
+        if (dateFrom && comanda.fechada_em && String(comanda.fechada_em) < dateFrom) return false
         return true
       })
 
@@ -130,7 +133,7 @@ export default function RelatoriosPage() {
           <h1 className="font-heading text-3xl lg:text-4xl font-bold">COMO FOI O DIA</h1>
           <p className="text-sm text-text-muted">Resumo das suas vendas</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Calendar size={16} className="text-text-muted" />
           {periodos.map(p => (
             <button
@@ -145,6 +148,17 @@ export default function RelatoriosPage() {
               {p.label}
             </button>
           ))}
+          <button
+            onClick={() => {
+              const periodoLabel = periodos.find(p => p.value === periodo)?.label || periodo
+              printRelatorio(resumo, periodoLabel, empresa?.nome)
+            }}
+            disabled={loading}
+            className="h-9 px-4 rounded-2xl bg-success text-text-dark font-heading text-sm font-semibold transition-colors cursor-pointer hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+          >
+            <FileDown size={14} />
+            Exportar PDF
+          </button>
         </div>
       </div>
 

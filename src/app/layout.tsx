@@ -1,7 +1,15 @@
 import type { Metadata, Viewport } from "next"
-import { Oswald, JetBrains_Mono } from "next/font/google"
+import { Inter, Oswald, JetBrains_Mono } from "next/font/google"
 import { ToastProvider } from "@/lib/toast-context"
+import { AuthProvider } from "@/lib/auth-context"
+import { PWAInstall } from "@/components/pwa-install"
 import "./globals.css"
+
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+})
 
 const oswald = Oswald({
   variable: "--font-oswald",
@@ -16,11 +24,26 @@ const jetbrains = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Espetinhos Milk - Sistema de Comandas",
-  description: "Sistema de comandas e controle de caixa para Espetinhos Milk",
+  title: "Espetinhos 1000K - Sistema de Comandas",
+  description: "Sistema de comandas e controle de caixa para Espetinhos 1000K",
   manifest: "/manifest.json",
   icons: {
     icon: "/favicon.ico",
+    apple: [
+      { url: "/icons/icon-152.png", sizes: "152x152" },
+      { url: "/icons/icon-192.png", sizes: "192x192" },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Espetinhos 1000K",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
   },
 }
 
@@ -38,10 +61,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className="dark">
-      <body className={`${oswald.variable} ${jetbrains.variable} antialiased bg-bg-page text-text-white`}>
-        <ToastProvider>
-          {children}
-        </ToastProvider>
+      <body className={`${inter.variable} ${oswald.variable} ${jetbrains.variable} antialiased bg-bg-page text-text-white`}>
+        <AuthProvider>
+          <ToastProvider>
+            {children}
+            <PWAInstall />
+          </ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   )

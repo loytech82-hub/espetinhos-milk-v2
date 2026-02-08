@@ -14,7 +14,7 @@ import { Search, Minus, Plus, Package } from 'lucide-react'
 interface AddItemModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  comandaId: number
+  comandaId: string
   onItemAdded: () => void
 }
 
@@ -108,7 +108,7 @@ export function AddItemModal({ open, onOpenChange, comandaId, onItemAdded }: Add
             />
           </div>
 
-          <div className="max-h-80 overflow-y-auto space-y-4">
+          <div className="max-h-[50dvh] lg:max-h-80 overflow-y-auto space-y-4">
             {Array.from(grouped.entries()).map(([categoria, prods]) => (
               <div key={categoria}>
                 <h3 className="font-heading text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 px-1">
@@ -123,16 +123,12 @@ export function AddItemModal({ open, onOpenChange, comandaId, onItemAdded }: Add
                       className="w-full flex items-center justify-between px-4 py-3 rounded-lg bg-bg-elevated hover:bg-bg-placeholder transition-colors text-left"
                     >
                       <div className="flex items-center gap-3">
-                        {p.imagem_url ? (
-                          <img src={p.imagem_url} alt={p.nome} className="w-10 h-10 rounded-lg object-cover shrink-0" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg bg-bg-placeholder flex items-center justify-center shrink-0">
-                            <Package size={16} className="text-text-muted" />
-                          </div>
-                        )}
+                        <div className="w-10 h-10 rounded-lg bg-bg-placeholder flex items-center justify-center shrink-0">
+                          <Package size={16} className="text-text-muted" />
+                        </div>
                         <div>
                           <span className="text-sm text-text-white font-medium">{p.nome}</span>
-                          <span className="text-xs text-text-muted block">Estoque: {p.estoque}</span>
+                          <span className="text-xs text-text-muted block">Estoque: {p.estoque_atual || 0}</span>
                         </div>
                       </div>
                       <span className="font-heading font-bold text-orange">{formatCurrency(p.preco)}</span>
@@ -155,7 +151,7 @@ export function AddItemModal({ open, onOpenChange, comandaId, onItemAdded }: Add
           <div className="flex items-center gap-4 p-4 bg-bg-elevated rounded-xl">
             <div className="flex-1">
               <h3 className="font-heading text-lg font-bold text-text-white">{produtoSelecionado.nome}</h3>
-              <p className="text-sm text-text-muted">{produtoSelecionado.categoria} · Estoque: {produtoSelecionado.estoque}</p>
+              <p className="text-sm text-text-muted">{produtoSelecionado.categoria} · Estoque: {produtoSelecionado.estoque_atual || 0}</p>
             </div>
             <span className="font-heading text-xl font-bold text-orange">
               {formatCurrency(produtoSelecionado.preco)}
@@ -176,7 +172,10 @@ export function AddItemModal({ open, onOpenChange, comandaId, onItemAdded }: Add
               <span className="font-heading text-2xl font-bold w-12 text-center">{quantidade}</span>
               <button
                 type="button"
-                onClick={() => setQuantidade(Math.min(produtoSelecionado.estoque, quantidade + 1))}
+                onClick={() => {
+                  const max = produtoSelecionado.controlar_estoque ? (produtoSelecionado.estoque_atual ?? 0) : 999
+                  setQuantidade(Math.min(max, quantidade + 1))
+                }}
                 className="w-10 h-10 flex items-center justify-center rounded-lg bg-bg-elevated hover:bg-bg-placeholder transition-colors"
               >
                 <Plus size={16} />

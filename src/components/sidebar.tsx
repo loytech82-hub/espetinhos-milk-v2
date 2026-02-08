@@ -66,15 +66,14 @@ export function Sidebar() {
       <Link
         href={href}
         className={cn(
-          'flex items-center gap-3 h-10 px-3 rounded-2xl transition-colors',
+          'flex items-center gap-3 h-10 px-3 rounded-lg transition-colors',
           isActive
-            ? 'text-text-white bg-bg-elevated'
-            : 'text-text-muted hover:text-text-white hover:bg-bg-card'
+            ? 'text-orange bg-orange/10 border-l-3 border-orange'
+            : 'text-text-muted hover:text-text-white hover:bg-bg-card border-l-3 border-transparent'
         )}
       >
-        <div className={cn('w-1.5 h-1.5 rounded-sm', isActive ? 'bg-orange' : 'bg-text-muted')} />
-        <Icon className="w-[18px] h-[18px]" />
-        <span className="text-[13px]">{label}</span>
+        <Icon className="w-5 h-5" />
+        <span className="text-sm">{label}</span>
       </Link>
     )
   }
@@ -89,7 +88,7 @@ export function Sidebar() {
             <Flame className="w-6 h-6 text-orange" />
           )}
           <span className="font-heading text-xl font-semibold text-text-white">
-            {empresa?.nome || 'ESPETINHOS'}
+            {empresa?.nome || 'ESPETINHOS 1000K'}
           </span>
         </Link>
 
@@ -97,9 +96,10 @@ export function Sidebar() {
           {filterByRole(mainNav).map(item => <NavLink key={item.href} {...item} />)}
 
           {/* Separador */}
-          <div className="flex items-center gap-2 mt-4 mb-1 px-3">
-            <MoreHorizontal className="w-3 h-3 text-text-muted" />
-            <span className="text-[11px] text-text-muted uppercase tracking-wider">Mais</span>
+          <div className="flex items-center gap-2 mt-5 mb-2 px-3">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-[10px] text-text-muted uppercase tracking-widest">Mais</span>
+            <div className="flex-1 h-px bg-border" />
           </div>
 
           {filterByRole(moreNav).map(item => <NavLink key={item.href} {...item} />)}
@@ -114,7 +114,7 @@ export function Sidebar() {
           <span className="text-xs text-text-white leading-tight">{nomeExibicao}</span>
           <span className="text-[10px] text-text-muted leading-tight">{role}</span>
         </div>
-        <button onClick={signOut} className="ml-auto text-text-muted hover:text-orange transition-colors cursor-pointer">
+        <button type="button" title="Sair" onClick={signOut} className="ml-auto text-text-muted hover:text-orange transition-colors cursor-pointer">
           <LogOut className="w-4 h-4" />
         </button>
       </div>

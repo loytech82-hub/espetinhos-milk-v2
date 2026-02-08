@@ -51,7 +51,7 @@ export default function DashboardPage() {
       const { data: comandasData } = await supabase
         .from('comandas')
         .select('*')
-        .order('created_at', { ascending: false })
+        .order('aberta_em', { ascending: false })
         .limit(3)
       if (comandasData) setComandas(comandasData)
 
@@ -60,7 +60,7 @@ export default function DashboardPage() {
         .from('comandas')
         .select('total')
         .eq('status', 'fechada')
-        .gte('created_at', hoje)
+        .gte('aberta_em', hoje)
       if (vendasData) {
         setVendasHoje(vendasData.reduce((acc, v) => acc + (v.total || 0), 0))
       }
@@ -81,24 +81,32 @@ export default function DashboardPage() {
       const baixo = await getProdutosEstoqueBaixo()
       setProdutosBaixo(baixo)
 
-      // Vendas dos ultimos 7 dias
+      // Vendas dos ultimos 7 dias — 1 query batch (era 7 queries separadas)
+      const seteDiasAtras = new Date()
+      seteDiasAtras.setDate(seteDiasAtras.getDate() - 6)
+      const dataInicio = seteDiasAtras.toISOString().split('T')[0]
+
+      const { data: vendasSemanaData } = await supabase
+        .from('comandas')
+        .select('total, aberta_em')
+        .eq('status', 'fechada')
+        .gte('aberta_em', dataInicio)
+
+      // Agrupar por dia no cliente
+      const vendasPorDia = new Map<string, number>()
+      vendasSemanaData?.forEach(v => {
+        const dia = v.aberta_em.split('T')[0]
+        vendasPorDia.set(dia, (vendasPorDia.get(dia) || 0) + (v.total || 0))
+      })
+
       const dias: { label: string; value: number }[] = []
       for (let i = 6; i >= 0; i--) {
         const d = new Date()
         d.setDate(d.getDate() - i)
         const diaStr = d.toISOString().split('T')[0]
-        const proximoDia = new Date(d)
-        proximoDia.setDate(proximoDia.getDate() + 1)
-        const { data: vendaDia } = await supabase
-          .from('comandas')
-          .select('total')
-          .eq('status', 'fechada')
-          .gte('created_at', diaStr)
-          .lt('created_at', proximoDia.toISOString().split('T')[0])
-        const total = vendaDia?.reduce((acc, v) => acc + (v.total || 0), 0) || 0
         dias.push({
           label: d.toLocaleDateString('pt-BR', { weekday: 'short' }).slice(0, 3),
-          value: total,
+          value: vendasPorDia.get(diaStr) || 0,
         })
       }
       setVendasSemana(dias)
@@ -130,7 +138,7 @@ export default function DashboardPage() {
     }
   }
 
-  function handleComandaCriada(id: number) {
+  function handleComandaCriada(id: string) {
     router.push(`/comandas/${id}`)
   }
 
@@ -163,9 +171,9 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {/* 3 Cards simples */}
+      {/* 3 Cards com hierarquia visual */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="flex flex-col gap-3 p-5 bg-bg-card rounded-2xl">
+        <div className="flex flex-col gap-3 p-5 bg-bg-card rounded-2xl border-l-4 border-success">
           <div className="flex items-center gap-2">
             <ArrowUpCircle className="w-4 h-4 text-success" />
             <span className="text-xs text-text-muted">Vendas de Hoje</span>
@@ -174,7 +182,7 @@ export default function DashboardPage() {
             {formatCurrency(vendasHoje)}
           </span>
         </div>
-        <div className="flex flex-col gap-3 p-5 bg-bg-card rounded-2xl">
+        <div className="flex flex-col gap-3 p-5 bg-bg-card rounded-2xl border-l-4 border-orange">
           <div className="flex items-center gap-2">
             <ClipboardList className="w-4 h-4 text-orange" />
             <span className="text-xs text-text-muted">Pedidos Abertos</span>
@@ -220,7 +228,7 @@ export default function DashboardPage() {
               {produtosBaixo.slice(0, 5).map(p => (
                 <div key={p.id} className="flex items-center justify-between py-1.5">
                   <span className="text-sm text-text-white">{p.nome}</span>
-                  <span className="font-mono text-xs text-danger font-bold">{p.estoque}/{p.estoque_minimo}</span>
+                  <span className="font-mono text-xs text-danger font-bold">{p.estoque_atual || 0}/{p.estoque_minimo}</span>
                 </div>
               ))}
               {produtosBaixo.length > 5 && (
@@ -292,7 +300,7 @@ export default function DashboardPage() {
                     {comanda.cliente_nome ? ` · ${comanda.cliente_nome}` : ''}
                   </p>
                   <p className="text-xs text-text-muted">
-                    {formatCurrency(comanda.total || 0)} · {new Date(comanda.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    {formatCurrency(comanda.total || 0)} · {new Date(comanda.aberta_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
                 <span className={`inline-flex items-center px-3 py-1 rounded-2xl text-[11px] font-semibold ${

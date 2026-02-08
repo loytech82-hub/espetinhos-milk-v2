@@ -30,7 +30,7 @@ export default function ComandasPage() {
       const { data } = await supabase
         .from('comandas')
         .select('*')
-        .order('created_at', { ascending: false })
+        .order('aberta_em', { ascending: false })
       if (data) setComandas(data)
     } catch (error) {
       console.error('Erro ao carregar pedidos:', error)

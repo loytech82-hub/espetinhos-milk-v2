@@ -21,8 +21,11 @@
 
   /* Texto — branco quente */
   --color-text-white: #F5F0EB;
-  --color-text-muted: #8B8178;
+  --color-text-muted: #9D948C;
   --color-text-dark: #0D0D0D;
+
+  /* Bordas sutis */
+  --color-border: #2A2722;
 
   /* Tipos de comanda */
   --color-delivery: #A855F7;
@@ -30,7 +33,7 @@
   --color-mesa: #FF6B35;
 
   /* Fontes */
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-inter), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains);
   --font-heading: var(--font-oswald);
 }
@@ -52,4 +55,13 @@ body {
 
 .animate-slide-in {
   animation: slide-in 0.2s ease-out;
+}
+
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.25s ease-out;
 }
