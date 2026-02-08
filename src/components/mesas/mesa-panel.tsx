@@ -267,7 +267,7 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
       <div className="fixed inset-0 z-40 bg-black/50" onClick={onClose} />
 
       {/* Painel lateral */}
-      <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-bg-page shadow-2xl flex flex-col animate-slide-in">
+      <div className="fixed inset-y-0 right-0 z-[60] w-full sm:w-[420px] bg-bg-page shadow-2xl flex flex-col animate-slide-in">
         {/* Header do painel */}
         <div className="flex items-center justify-between p-5 border-b border-bg-elevated">
           <div>
@@ -543,7 +543,7 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
 
         {/* Footer fixo (so no modo pedido com itens) */}
         {mode === 'pedido' && comanda && (
-          <div className="border-t border-bg-elevated p-5 space-y-3">
+          <div className="border-t border-bg-elevated p-5 pb-24 sm:pb-5 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-text-muted">Total</span>
               <span className="font-heading text-3xl font-bold text-orange">

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, ClipboardList, Trash2 } from 'lucide-react'
+import { Plus, Search, ClipboardList, Trash2, ChevronRight } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { cancelComanda } from '@/lib/supabase-helpers'
@@ -158,54 +158,54 @@ export default function ComandasPage() {
           description={busca ? 'Tente outra busca' : 'Crie o primeiro pedido clicando no botao acima'}
         />
       ) : (
-        <div className="rounded-2xl overflow-hidden">
-          <div className="hidden sm:grid grid-cols-6 h-11 px-5 bg-bg-card items-center">
-            <span className="text-xs text-text-muted">Pedido</span>
-            <span className="text-xs text-text-muted">Tipo</span>
-            <span className="text-xs text-text-muted">Cliente</span>
-            <span className="text-xs text-text-muted">Valor</span>
-            <span className="text-xs text-text-muted">Status</span>
-            <span className="text-xs text-text-muted text-right">Acao</span>
-          </div>
+        <div className="space-y-2">
+          {filtered.map((comanda) => (
+            <div
+              key={comanda.id}
+              onClick={() => router.push(`/comandas/${comanda.id}`)}
+              className="flex items-center gap-3 px-4 py-3 bg-bg-card rounded-2xl hover:bg-bg-elevated transition-colors cursor-pointer"
+            >
+              {/* Numero */}
+              <div className="w-12 h-12 rounded-xl bg-bg-elevated flex items-center justify-center shrink-0">
+                <span className="font-mono text-sm font-bold text-text-white">
+                  {String(comanda.numero).padStart(3, '0')}
+                </span>
+              </div>
 
-          <div className="space-y-px">
-            {filtered.map((comanda) => (
-              <div
-                key={comanda.id}
-                className="grid grid-cols-[1fr_1fr_auto] sm:grid-cols-6 gap-2 px-5 py-4 sm:h-14 bg-bg-card items-center hover:bg-bg-elevated transition-colors"
-              >
-                <a href={`/comandas/${comanda.id}`} className="font-mono text-[13px] text-text-white font-semibold cursor-pointer hover:text-orange">
-                  #{String(comanda.numero).padStart(3, '0')}
-                </a>
-                <div>
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
                   <StatusBadge variant={tipoBadgeVariant(comanda.tipo)} dot>
                     {comanda.tipo === 'mesa' ? 'Mesa' : comanda.tipo === 'balcao' ? 'Balcao' : 'Delivery'}
                   </StatusBadge>
-                </div>
-                <span className="hidden sm:block text-[13px] text-text-white truncate">
-                  {comanda.cliente_nome || '—'}
-                </span>
-                <span className="hidden sm:block font-heading text-[13px] text-text-white font-bold">
-                  {formatCurrency(comanda.total || 0)}
-                </span>
-                <div className="hidden sm:block">
                   <StatusBadge variant={statusBadgeVariant(comanda.status)}>
                     {statusLabels[comanda.status] || comanda.status}
                   </StatusBadge>
                 </div>
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={(e) => { e.preventDefault(); setDeleteTarget(comanda) }}
-                    title={comanda.status === 'aberta' ? 'Cancelar pedido' : 'Excluir pedido'}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
+                <p className="text-xs text-text-muted mt-1 truncate">
+                  {comanda.cliente_nome || 'Sem cliente'}
+                  {' · '}
+                  {new Date(comanda.aberta_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                </p>
               </div>
-            ))}
-          </div>
+
+              {/* Valor + acoes */}
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="font-heading text-sm font-bold text-orange">
+                  {formatCurrency(comanda.total || 0)}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setDeleteTarget(comanda) }}
+                  title={comanda.status === 'aberta' ? 'Cancelar pedido' : 'Excluir pedido'}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                >
+                  <Trash2 size={14} />
+                </button>
+                <ChevronRight size={16} className="text-text-muted" />
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
