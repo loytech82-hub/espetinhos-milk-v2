@@ -83,8 +83,9 @@ export default function LoginPage() {
 
       router.push('/')
       router.refresh()
-    } catch {
-      setError('Erro ao conectar. Tente novamente.')
+    } catch (err) {
+      console.error('Erro cadastro:', err)
+      setError(err instanceof Error ? err.message : 'Erro ao conectar. Tente novamente.')
     } finally {
       setLoading(false)
     }

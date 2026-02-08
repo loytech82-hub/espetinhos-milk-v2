@@ -29,18 +29,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: createError.message }, { status: 500 })
     }
 
-    // Atualizar profile para role='admin'
-    // (o trigger do banco cria como 'garcom', entao precisamos corrigir)
+    // Garantir profile com role='admin' via upsert
+    // (o trigger do banco pode ou nao ter criado o profile ainda)
     if (newUser?.user) {
-      await supabaseAdmin
+      // Aguardar um pouco para o trigger criar o profile
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      const { error: profileError } = await supabaseAdmin
         .from('profiles')
-        .update({ role: 'admin', nome: nome.trim() })
-        .eq('id', newUser.user.id)
+        .upsert({
+          id: newUser.user.id,
+          nome: nome.trim(),
+          email: email.trim(),
+          role: 'admin',
+        })
+
+      if (profileError) {
+        console.error('Erro ao criar profile:', profileError)
+      }
     }
 
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('Erro ao criar admin:', error)
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
   }
 }
