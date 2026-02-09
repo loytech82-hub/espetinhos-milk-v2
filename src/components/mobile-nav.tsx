@@ -10,7 +10,6 @@ import {
   DollarSign,
   MoreHorizontal,
   Package,
-  Warehouse,
   Users,
   BarChart3,
   Settings,
@@ -36,8 +35,7 @@ const mainItems: NavItem[] = [
 ]
 
 const moreItems: NavItem[] = [
-  { href: '/produtos', label: 'Cardapio', icon: Package, roles: ['admin'] },
-  { href: '/estoque', label: 'Estoque', icon: Warehouse, roles: ['admin', 'caixa'] },
+  { href: '/produtos', label: 'Produtos', icon: Package, roles: ['admin'] },
   { href: '/clientes', label: 'Clientes', icon: Users },
   { href: '/relatorios', label: 'Relatorios', icon: BarChart3, roles: ['admin'] },
   { href: '/configuracoes', label: 'Configuracoes', icon: Settings, roles: ['admin'] },

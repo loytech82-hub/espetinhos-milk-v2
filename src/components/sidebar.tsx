@@ -13,7 +13,6 @@ import {
   Flame,
   LogOut,
   MoreHorizontal,
-  Warehouse,
   Settings,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -36,8 +35,7 @@ const mainNav: NavItem[] = [
 ]
 
 const moreNav: NavItem[] = [
-  { href: '/produtos', label: 'Cardapio', icon: Package, roles: ['admin'] },
-  { href: '/estoque', label: 'Estoque', icon: Warehouse, roles: ['admin', 'caixa'] },
+  { href: '/produtos', label: 'Produtos', icon: Package, roles: ['admin'] },
   { href: '/clientes', label: 'Clientes', icon: Users },
   { href: '/relatorios', label: 'Relatorios', icon: BarChart3, roles: ['admin'] },
   { href: '/configuracoes', label: 'Config', icon: Settings, roles: ['admin'] },

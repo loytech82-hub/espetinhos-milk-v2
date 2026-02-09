@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Search, AlertTriangle, Package } from 'lucide-react'
+import { Plus, Search, AlertTriangle, Package, ArrowUpCircle, Sliders } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { toggleProdutoAtivo } from '@/lib/supabase-helpers'
@@ -10,7 +10,10 @@ import { useAuth } from '@/lib/auth-context'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { AccessDenied } from '@/components/ui/access-denied'
+import { Button } from '@/components/ui/button'
 import { ProdutoModal } from '@/components/produtos/produto-modal'
+import { EntradaEstoqueModal } from '@/components/estoque/entrada-estoque-modal'
+import { AjusteEstoqueModal } from '@/components/estoque/ajuste-estoque-modal'
 import type { Produto } from '@/lib/types'
 
 export default function ProdutosPage() {
@@ -22,6 +25,8 @@ export default function ProdutosPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editProduto, setEditProduto] = useState<Produto | null>(null)
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>('todas')
+  const [entradaOpen, setEntradaOpen] = useState(false)
+  const [ajusteOpen, setAjusteOpen] = useState(false)
 
   useEffect(() => {
     loadProdutos()
@@ -54,6 +59,8 @@ export default function ProdutosPage() {
   })
 
   const estoqueBaixo = produtos.filter((p) => (p.estoque_atual || 0) <= p.estoque_minimo && p.ativo)
+  const totalItens = produtos.reduce((acc, p) => acc + (p.estoque_atual || 0), 0)
+  const valorEstoque = produtos.reduce((acc, p) => acc + (p.preco * (p.estoque_atual || 0)), 0)
 
   async function handleToggleAtivo(produto: Produto) {
     try {
@@ -75,17 +82,17 @@ export default function ProdutosPage() {
     setModalOpen(true)
   }
 
-  // Somente admin pode acessar
   if (role !== 'admin') return <AccessDenied />
 
   return (
     <div className="p-6 lg:p-10 space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl lg:text-4xl font-bold">CARDAPIO</h1>
-          <p className="text-sm text-text-muted">Seu cardapio</p>
+          <h1 className="font-heading text-3xl lg:text-4xl font-bold">PRODUTOS</h1>
+          <p className="text-sm text-text-muted">Cadastro e estoque dos seus produtos</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-2 h-10 px-4 bg-bg-elevated rounded-2xl">
             <Search className="w-3.5 h-3.5 text-text-muted" />
             <input
@@ -96,6 +103,14 @@ export default function ProdutosPage() {
               className="bg-transparent text-xs text-text-white placeholder:text-text-muted outline-none w-32"
             />
           </div>
+          <Button onClick={() => setEntradaOpen(true)} variant="success" className="h-10 text-sm">
+            <ArrowUpCircle className="w-4 h-4" />
+            Entrada
+          </Button>
+          <Button onClick={() => setAjusteOpen(true)} variant="secondary" className="h-10 text-sm">
+            <Sliders className="w-4 h-4" />
+            Ajuste
+          </Button>
           <button
             onClick={handleNew}
             className="inline-flex items-center gap-2 h-10 px-5 bg-orange text-text-dark font-heading text-sm font-semibold rounded-2xl hover:bg-orange-hover transition-colors cursor-pointer"
@@ -106,15 +121,40 @@ export default function ProdutosPage() {
         </div>
       </div>
 
+      {/* Resumo rapido */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="flex flex-col gap-1 p-4 bg-bg-card rounded-2xl">
+          <span className="text-[10px] text-text-muted uppercase tracking-wider">Produtos</span>
+          <span className="font-heading text-2xl font-bold">{produtos.length}</span>
+        </div>
+        <div className="flex flex-col gap-1 p-4 bg-bg-card rounded-2xl">
+          <span className="text-[10px] text-text-muted uppercase tracking-wider">Estoque Baixo</span>
+          <span className="font-heading text-2xl font-bold text-danger">{estoqueBaixo.length}</span>
+        </div>
+        <div className="flex flex-col gap-1 p-4 bg-bg-card rounded-2xl">
+          <span className="text-[10px] text-text-muted uppercase tracking-wider">Itens Totais</span>
+          <span className="font-heading text-2xl font-bold">{totalItens}</span>
+        </div>
+        <div className="flex flex-col gap-1 p-4 bg-bg-card rounded-2xl">
+          <span className="text-[10px] text-text-muted uppercase tracking-wider">Valor Estoque</span>
+          <span className="font-heading text-2xl font-bold text-orange">{formatCurrency(valorEstoque)}</span>
+        </div>
+      </div>
+
+      {/* Alerta de estoque baixo */}
       {estoqueBaixo.length > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-warning/10 rounded-2xl border border-warning/30">
-          <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
-          <span className="text-sm text-text-white">
-            <strong>{estoqueBaixo.length}</strong> produto(s) com estoque baixo
-          </span>
+        <div className="flex items-start gap-3 p-3 bg-warning/10 rounded-2xl border border-warning/30">
+          <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+          <div>
+            <span className="text-sm text-text-white font-medium">Estoque baixo: </span>
+            <span className="text-sm text-text-muted">
+              {estoqueBaixo.map(p => `${p.nome} (${p.estoque_atual || 0})`).join(', ')}
+            </span>
+          </div>
         </div>
       )}
 
+      {/* Filtro de categorias */}
       <div className="flex gap-2 overflow-x-auto pb-1">
         {categorias.map(cat => (
           <button
@@ -131,6 +171,7 @@ export default function ProdutosPage() {
         ))}
       </div>
 
+      {/* Lista de produtos */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <span className="text-text-muted">carregando...</span>
@@ -138,13 +179,13 @@ export default function ProdutosPage() {
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={Package}
-          title="Nenhum produto encontrado"
-          description="Adicione produtos ao cardapio"
+          title="Nenhum produto cadastrado"
+          description="Clique em 'Novo Produto' para comecar a cadastrar"
         />
       ) : (
         <div className="rounded-2xl overflow-hidden">
-          <div className="hidden sm:grid grid-cols-5 h-11 px-5 bg-bg-card items-center">
-            <span className="text-xs text-text-muted">Produto</span>
+          <div className="hidden sm:grid grid-cols-6 h-11 px-5 bg-bg-card items-center">
+            <span className="text-xs text-text-muted col-span-2">Produto</span>
             <span className="text-xs text-text-muted">Categoria</span>
             <span className="text-xs text-text-muted">Preco</span>
             <span className="text-xs text-text-muted">Estoque</span>
@@ -156,9 +197,9 @@ export default function ProdutosPage() {
               <div
                 key={produto.id}
                 onClick={() => handleEdit(produto)}
-                className="grid grid-cols-2 sm:grid-cols-5 gap-2 px-5 py-4 sm:h-14 bg-bg-card items-center hover:bg-bg-elevated transition-colors cursor-pointer"
+                className="grid grid-cols-2 sm:grid-cols-6 gap-2 px-5 py-4 sm:h-14 bg-bg-card items-center hover:bg-bg-elevated transition-colors cursor-pointer"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 col-span-2">
                   {produto.foto_url ? (
                     <img src={produto.foto_url} alt={produto.nome} className="w-10 h-10 rounded-lg object-cover shrink-0" />
                   ) : (
@@ -200,12 +241,15 @@ export default function ProdutosPage() {
         </div>
       )}
 
+      {/* Modais */}
       <ProdutoModal
         open={modalOpen}
         onOpenChange={(v) => { setModalOpen(v); if (!v) setEditProduto(null) }}
         produto={editProduto}
         onSaved={loadProdutos}
       />
+      <EntradaEstoqueModal open={entradaOpen} onOpenChange={setEntradaOpen} produtos={produtos} onCreated={loadProdutos} />
+      <AjusteEstoqueModal open={ajusteOpen} onOpenChange={setAjusteOpen} produtos={produtos} onCreated={loadProdutos} />
     </div>
   )
 }
