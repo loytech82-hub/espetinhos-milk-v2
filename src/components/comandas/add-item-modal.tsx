@@ -26,6 +26,7 @@ export function AddItemModal({ open, onOpenChange, comandaId, onItemAdded }: Add
   const [quantidade, setQuantidade] = useState(1)
   const [observacao, setObservacao] = useState('')
   const [loading, setLoading] = useState(false)
+  const [continuarAdicionando, setContinuarAdicionando] = useState(false)
 
   // Carregar produtos ativos
   useEffect(() => {
@@ -79,11 +80,16 @@ export function AddItemModal({ open, onOpenChange, comandaId, onItemAdded }: Add
     try {
       await addItemToComanda(comandaId, produtoSelecionado.id, quantidade, observacao || null)
       toast(`${produtoSelecionado.nome} adicionado!`, 'success')
-      // Permitir adicionar outro item sem fechar
-      setProdutoSelecionado(null)
-      setQuantidade(1)
-      setObservacao('')
       onItemAdded()
+      // Fecha modal por padrao, ou continua adicionando
+      if (!continuarAdicionando) {
+        onOpenChange(false)
+      } else {
+        setProdutoSelecionado(null)
+        setQuantidade(1)
+        setObservacao('')
+        setContinuarAdicionando(false)
+      }
     } catch (err: unknown) {
       toast((err as Error).message, 'error')
     } finally {
@@ -210,8 +216,11 @@ export function AddItemModal({ open, onOpenChange, comandaId, onItemAdded }: Add
             <Button type="button" variant="ghost" onClick={() => setProdutoSelecionado(null)}>
               Voltar
             </Button>
-            <Button onClick={handleAdd} loading={loading}>
-              Adicionar ({quantidade}x)
+            <Button type="button" variant="ghost" onClick={() => { setContinuarAdicionando(true); handleAdd() }} loading={loading && continuarAdicionando}>
+              Adicionar +
+            </Button>
+            <Button onClick={handleAdd} loading={loading && !continuarAdicionando}>
+              Adicionar
             </Button>
           </div>
         </div>

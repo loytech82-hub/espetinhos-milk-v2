@@ -40,6 +40,7 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
   const [quantidade, setQuantidade] = useState(1)
   const [observacao, setObservacao] = useState('')
   const [addLoading, setAddLoading] = useState(false)
+  const [continuarAdicionando, setContinuarAdicionando] = useState(false)
 
   // Remover item
   const [removingId, setRemovingId] = useState<string | null>(null)
@@ -154,10 +155,14 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
         .single()
       if (comandaData) setComanda(comandaData)
 
-      // Reset selecao
+      // Reset selecao e decidir se volta ao pedido ou continua adicionando
       setProdutoSelecionado(null)
       setQuantidade(1)
       setObservacao('')
+      if (!continuarAdicionando) {
+        setMode('pedido')
+      }
+      setContinuarAdicionando(false)
     } catch (err: unknown) {
       toast((err as Error).message, 'error')
     } finally {
@@ -460,8 +465,11 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
                     <Button variant="ghost" onClick={() => { setProdutoSelecionado(null); setQuantidade(1); setObservacao('') }} className="flex-1">
                       Voltar
                     </Button>
-                    <Button onClick={handleAddItem} loading={addLoading} className="flex-1">
-                      Adicionar ({quantidade}x)
+                    <Button variant="ghost" onClick={() => { setContinuarAdicionando(true); handleAddItem() }} loading={addLoading && continuarAdicionando} className="flex-1">
+                      Adicionar +
+                    </Button>
+                    <Button onClick={handleAddItem} loading={addLoading && !continuarAdicionando} className="flex-1">
+                      Adicionar
                     </Button>
                   </div>
                 </div>
@@ -540,6 +548,25 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
             </div>
           )}
         </div>
+
+        {/* Footer flutuante no modo adicionar — mostra resumo do pedido */}
+        {mode === 'adicionar' && !produtoSelecionado && itens.length > 0 && (
+          <div className="border-t border-bg-elevated p-4 pb-24 sm:pb-4">
+            <button
+              type="button"
+              onClick={() => setMode('pedido')}
+              className="w-full flex items-center justify-between p-3 bg-bg-card rounded-xl hover:bg-bg-elevated transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <span className="bg-orange text-text-dark text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">
+                  {itens.length}
+                </span>
+                <span className="text-sm font-medium text-text-white">Ver Pedido</span>
+              </div>
+              <span className="font-heading font-bold text-orange">{formatCurrency(total)}</span>
+            </button>
+          </div>
+        )}
 
         {/* Footer fixo (so no modo pedido com itens) */}
         {mode === 'pedido' && comanda && (
