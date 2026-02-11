@@ -136,14 +136,12 @@ export function NovaComandaModal({ open, onOpenChange, onCreated, defaultMesaId 
         )}
 
         {/* Nome do cliente */}
-        {(tipo === 'delivery' || tipo === 'balcao') && (
-          <Input
-            label={tipo === 'delivery' ? 'Nome do Cliente *' : 'Nome do Cliente (opcional)'}
-            value={clienteNome}
-            onChange={e => setClienteNome(e.target.value)}
-            placeholder="Nome do cliente"
-          />
-        )}
+        <Input
+          label={tipo === 'delivery' ? 'Nome do Cliente *' : 'Nome do Cliente (opcional)'}
+          value={clienteNome}
+          onChange={e => setClienteNome(e.target.value)}
+          placeholder="Nome do cliente"
+        />
 
         {/* Botoes */}
         <div className="flex gap-3 justify-end pt-2">

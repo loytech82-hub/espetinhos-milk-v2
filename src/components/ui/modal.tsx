@@ -16,8 +16,8 @@ export function Modal({ open, onOpenChange, title, description, children, maxWid
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className={`fixed z-50 bg-bg-card shadow-2xl inset-0 flex flex-col lg:inset-auto lg:left-1/2 lg:-translate-x-1/2 lg:top-1/2 lg:-translate-y-1/2 lg:w-[95vw] ${maxWidth} lg:rounded-xl lg:border lg:border-bg-elevated lg:max-h-[90vh] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95`}>
+        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <Dialog.Content className={`fixed z-[70] bg-bg-card shadow-2xl inset-0 flex flex-col lg:inset-auto lg:left-1/2 lg:-translate-x-1/2 lg:top-1/2 lg:-translate-y-1/2 lg:w-[95vw] ${maxWidth} lg:rounded-xl lg:border lg:border-bg-elevated lg:max-h-[90vh] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95`}>
           {/* Header fixo */}
           <div className="shrink-0 flex items-center justify-between p-4 pb-3 border-b border-bg-elevated lg:p-6 lg:pb-4 lg:border-0">
             <div>
