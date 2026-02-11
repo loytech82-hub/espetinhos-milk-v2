@@ -200,6 +200,19 @@ async function handleToggleProdutoAtivo(params: { id: string; ativo: boolean }) 
 }
 
 async function handleDeleteProduto(params: { id: string }) {
+  // Verificar se produto esta sendo usado em algum pedido
+  const { count } = await supabaseAdmin
+    .from('comanda_itens')
+    .select('id', { count: 'exact', head: true })
+    .eq('produto_id', params.id)
+
+  if (count && count > 0) {
+    return NextResponse.json(
+      { error: 'Este produto ja foi usado em pedidos e nao pode ser excluido. Desative-o em vez de excluir.' },
+      { status: 400 }
+    )
+  }
+
   // Buscar produto para deletar foto do storage se houver
   const { data: produto } = await supabaseAdmin
     .from('produtos')
@@ -207,7 +220,15 @@ async function handleDeleteProduto(params: { id: string }) {
     .eq('id', params.id)
     .single()
 
-  // Deletar foto do storage se existir
+  // Deletar produto primeiro (antes da foto, para evitar perda de dados)
+  const { error } = await supabaseAdmin
+    .from('produtos')
+    .delete()
+    .eq('id', params.id)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Deletar foto do storage depois do produto (so se exclusao deu certo)
   if (produto?.foto_url) {
     const parts = produto.foto_url.split('/')
     const fileName = parts[parts.length - 1]
@@ -216,12 +237,6 @@ async function handleDeleteProduto(params: { id: string }) {
     }
   }
 
-  const { error } = await supabaseAdmin
-    .from('produtos')
-    .delete()
-    .eq('id', params.id)
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ result: true })
 }
 
