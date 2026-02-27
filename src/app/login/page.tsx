@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [codigoEmpresa, setCodigoEmpresa] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -91,13 +92,20 @@ export default function LoginPage() {
     }
   }
 
-  // Login garcom — conta compartilhada via API
-  async function handleGarcomLogin() {
+  // Login garcom — conta compartilhada via API com codigo da empresa
+  async function handleGarcomLogin(e: React.FormEvent) {
+    e.preventDefault()
+    if (!codigoEmpresa.trim()) { setError('Informe o codigo da empresa'); return }
+
     setLoading(true)
     setError('')
 
     try {
-      const res = await fetch('/api/auth/garcom', { method: 'POST' })
+      const res = await fetch('/api/auth/garcom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codigoEmpresa: codigoEmpresa.trim().toUpperCase() }),
+      })
       const data = await res.json()
 
       if (!res.ok || data.error) {
@@ -312,9 +320,9 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* Tab: Garcom — botao unico */}
+        {/* Tab: Garcom — codigo da empresa */}
         {tab === 'garcom' && (
-          <div className="space-y-6">
+          <form onSubmit={handleGarcomLogin} className="space-y-6">
             <div className="text-center space-y-3 py-4">
               <div className="w-16 h-16 bg-[#2D2D2D] rounded-2xl flex items-center justify-center mx-auto">
                 <Users className="w-8 h-8 text-[#FF6B35]" />
@@ -323,24 +331,32 @@ export default function LoginPage() {
                 Acesso rapido para garcons e atendentes
               </p>
               <p className="font-mono text-[11px] text-[#555]">
-                Pedidos, mesas e clientes
+                Peca o codigo ao administrador
               </p>
             </div>
 
+            <div className="space-y-2">
+              <label className="font-mono text-xs text-[#777]">codigo da empresa</label>
+              <input
+                type="text"
+                value={codigoEmpresa}
+                onChange={(e) => setCodigoEmpresa(e.target.value.toUpperCase().slice(0, 6))}
+                placeholder="EX: A1B2C3"
+                maxLength={6}
+                className="w-full h-11 px-4 bg-[#2D2D2D] rounded-2xl font-mono text-sm text-white placeholder:text-[#777] outline-none focus:ring-2 focus:ring-[#FF6B35] transition-all text-center tracking-[0.3em] uppercase"
+                required
+              />
+            </div>
+
             <button
-              type="button"
-              onClick={handleGarcomLogin}
-              disabled={loading}
+              type="submit"
+              disabled={loading || codigoEmpresa.trim().length < 3}
               className="w-full h-14 bg-[#FF6B35] hover:bg-[#E85A24] rounded-2xl font-mono text-base font-bold text-[#0D0D0D] flex items-center justify-center gap-3 transition-colors disabled:opacity-50 cursor-pointer"
             >
               <Users className="w-5 h-5" />
               {loading ? 'entrando...' : 'Entrar como Garcom'}
             </button>
-
-            <p className="font-mono text-[11px] text-[#555] text-center">
-              Nao precisa de email ou senha
-            </p>
-          </div>
+          </form>
         )}
       </div>
     </div>

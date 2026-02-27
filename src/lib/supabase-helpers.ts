@@ -112,7 +112,7 @@ export async function cancelComanda(comandaId: string): Promise<void> {
 // PRODUTOS
 // ============================================
 
-export async function createProduto(produto: Omit<Produto, 'id' | 'created_at'>): Promise<Produto> {
+export async function createProduto(produto: Omit<Produto, 'id' | 'created_at' | 'empresa_id'>): Promise<Produto> {
   return apiCall<Produto>('createProduto', { produto })
 }
 
@@ -138,6 +138,10 @@ export async function createCliente(cliente: { nome: string; telefone?: string; 
 
 export async function updateCliente(id: string, updates: Partial<Cliente>): Promise<Cliente> {
   return apiCall<Cliente>('updateCliente', { id, updates })
+}
+
+export async function deleteCliente(id: string): Promise<void> {
+  await apiCall('deleteCliente', { id })
 }
 
 // ============================================

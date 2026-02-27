@@ -9,6 +9,7 @@ interface AuthContextType {
   user: User | null
   profile: Profile | null
   role: UserRole
+  empresaId: number | null
   loading: boolean
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
@@ -78,9 +79,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Role padrao: garcom (mais seguro) enquanto profile nao carrega
   const role: UserRole = profile?.role || 'garcom'
+  const empresaId: number | null = profile?.empresa_id ?? null
 
   return (
-    <AuthContext.Provider value={{ user, profile, role, loading, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, role, empresaId, loading, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   )

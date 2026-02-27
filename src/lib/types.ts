@@ -4,6 +4,7 @@ export interface Mesa {
   id: number
   numero: number
   status: 'livre' | 'ocupada' | 'reservada'
+  empresa_id: number
   created_at: string
 }
 
@@ -26,6 +27,7 @@ export interface Comanda {
   fiado_pago: boolean
   fiado_pago_em: string | null
   fiado_prazo_dias: number | null
+  empresa_id: number
 }
 
 export interface ComandaItem {
@@ -36,6 +38,7 @@ export interface ComandaItem {
   preco_unitario: number
   subtotal: number
   observacao: string | null
+  empresa_id: number
   created_at: string
   produto?: Produto
 }
@@ -50,6 +53,7 @@ export interface Produto {
   estoque_minimo: number
   controlar_estoque: boolean
   ativo: boolean
+  empresa_id: number
   created_at: string
 }
 
@@ -61,6 +65,7 @@ export interface CaixaMovimento {
   forma_pagamento: string | null
   comanda_id: string | null
   turno_id: number | null
+  empresa_id: number
   created_at: string
 }
 
@@ -69,6 +74,10 @@ export interface Cliente {
   nome: string
   telefone: string | null
   endereco: string | null
+  desconto_percentual: number | null
+  desconto_validade: string | null
+  desconto_motivo: string | null
+  empresa_id: number
   created_at: string
 }
 
@@ -80,6 +89,7 @@ export interface Profile {
   email: string
   role: UserRole
   ativo: boolean
+  empresa_id: number
   created_at: string
   updated_at: string
 }
@@ -97,6 +107,7 @@ export interface CaixaTurno {
   observacao_fechamento: string | null
   aberto_em: string
   fechado_em: string | null
+  empresa_id: number
 }
 
 export interface EstoqueMovimento {
@@ -109,6 +120,7 @@ export interface EstoqueMovimento {
   motivo: string | null
   usuario_id: string | null
   comanda_id: string | null
+  empresa_id: number
   created_at: string
   produto?: Produto
 }
@@ -120,6 +132,7 @@ export interface Categoria {
   icone: string
   ordem: number
   ativo: boolean
+  empresa_id: number
   created_at: string
 }
 
@@ -130,6 +143,7 @@ export interface Empresa {
   telefone: string | null
   cnpj: string | null
   logo_url: string | null
+  codigo_acesso: string | null
   created_at: string
   updated_at: string
 }

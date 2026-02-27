@@ -1,39 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { supabaseAdmin } from '@/lib/supabase-server'
-
-// Extrair usuario logado dos cookies
-async function getAuthUserId(request: NextRequest): Promise<string | null> {
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll() {},
-      },
-    }
-  )
-  const { data: { user } } = await supabase.auth.getUser()
-  return user?.id || null
-}
+import { supabaseAdmin, getRequestContext } from '@/lib/supabase-server'
 
 // POST /api/caixa/turno — Abrir turno do caixa
 export async function POST(request: NextRequest) {
   try {
+    const ctx = await getRequestContext(request)
     const body = await request.json()
     const { valor_abertura, observacao } = body
 
-    // Buscar usuario logado
-    const userId = await getAuthUserId(request)
-
-    // Verificar se ja existe turno aberto
+    // Verificar se ja existe turno aberto na mesma empresa
     const { data: turnoExistente } = await supabaseAdmin
       .from('caixa_turnos')
       .select('id')
       .eq('status', 'aberto')
+      .eq('empresa_id', ctx.empresaId)
       .limit(1)
 
     if (turnoExistente && turnoExistente.length > 0) {
@@ -49,7 +29,8 @@ export async function POST(request: NextRequest) {
         valor_abertura,
         observacao_abertura: observacao || null,
         status: 'aberto',
-        usuario_id: userId,
+        usuario_id: ctx.userId,
+        empresa_id: ctx.empresaId,
       })
       .select()
       .single()

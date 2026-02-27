@@ -1,50 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-server'
+import { supabaseAdmin, getRequestContext } from '@/lib/supabase-server'
 
 // API central para operacoes de escrita — usa service_role para bypassar RLS
+// Todas as operacoes filtram por empresa_id do usuario logado
 export async function POST(request: NextRequest) {
   try {
+    const ctx = await getRequestContext(request)
     const { action, params } = await request.json()
+    const empresaId = ctx.empresaId
 
     switch (action) {
       case 'createComanda':
-        return await handleCreateComanda(params)
+        return await handleCreateComanda(params, empresaId)
       case 'addItemToComanda':
-        return await handleAddItemToComanda(params)
+        return await handleAddItemToComanda(params, empresaId)
       case 'createProduto':
-        return await handleCreateProduto(params)
+        return await handleCreateProduto(params, empresaId)
       case 'updateProduto':
-        return await handleUpdateProduto(params)
+        return await handleUpdateProduto(params, empresaId)
       case 'toggleProdutoAtivo':
-        return await handleToggleProdutoAtivo(params)
+        return await handleToggleProdutoAtivo(params, empresaId)
       case 'deleteProduto':
-        return await handleDeleteProduto(params)
+        return await handleDeleteProduto(params, empresaId)
       case 'createCliente':
-        return await handleCreateCliente(params)
+        return await handleCreateCliente(params, empresaId)
       case 'updateCliente':
-        return await handleUpdateCliente(params)
+        return await handleUpdateCliente(params, empresaId)
+      case 'deleteCliente':
+        return await handleDeleteCliente(params, empresaId)
       case 'createCaixaMovimento':
-        return await handleCreateCaixaMovimento(params)
+        return await handleCreateCaixaMovimento(params, empresaId)
       case 'createMesa':
-        return await handleCreateMesa(params)
+        return await handleCreateMesa(params, empresaId)
       case 'updateMesaStatus':
-        return await handleUpdateMesaStatus(params)
+        return await handleUpdateMesaStatus(params, empresaId)
       case 'deleteMesa':
-        return await handleDeleteMesa(params)
+        return await handleDeleteMesa(params, empresaId)
       case 'fecharTurno':
-        return await handleFecharTurno(params)
+        return await handleFecharTurno(params, empresaId)
       case 'entradaEstoque':
-        return await handleEntradaEstoque(params)
+        return await handleEntradaEstoque(params, empresaId)
       case 'ajusteEstoque':
-        return await handleAjusteEstoque(params)
+        return await handleAjusteEstoque(params, empresaId)
       case 'updateEmpresa':
-        return await handleUpdateEmpresa(params)
+        return await handleUpdateEmpresa(params, empresaId)
       case 'updateItemQuantidade':
-        return await handleUpdateItemQuantidade(params)
+        return await handleUpdateItemQuantidade(params, empresaId)
       case 'receberFiado':
-        return await handleReceberFiado(params)
+        return await handleReceberFiado(params, empresaId)
       case 'registrarMovimentoEstoque':
-        return await handleRegistrarMovimentoEstoque(params)
+        return await handleRegistrarMovimentoEstoque(params, empresaId)
       default:
         return NextResponse.json({ error: `Acao desconhecida: ${action}` }, { status: 400 })
     }
@@ -62,13 +67,14 @@ async function handleCreateComanda(params: {
   tipo: string
   mesaId?: number | null
   clienteNome?: string | null
-}) {
+}, empresaId: number) {
   const { tipo, mesaId, clienteNome } = params
 
-  // Proximo numero
+  // Proximo numero (dentro da empresa)
   const { data: lastComanda } = await supabaseAdmin
     .from('comandas')
     .select('numero')
+    .eq('empresa_id', empresaId)
     .order('numero', { ascending: false })
     .limit(1)
   const numero = (lastComanda?.[0]?.numero || 0) + 1
@@ -82,6 +88,7 @@ async function handleCreateComanda(params: {
       cliente_nome: clienteNome || null,
       status: 'aberta',
       total: 0,
+      empresa_id: empresaId,
     })
     .select()
     .single()
@@ -90,7 +97,7 @@ async function handleCreateComanda(params: {
 
   // Atualizar mesa para ocupada
   if (tipo === 'mesa' && mesaId) {
-    await supabaseAdmin.from('mesas').update({ status: 'ocupada' }).eq('id', mesaId)
+    await supabaseAdmin.from('mesas').update({ status: 'ocupada' }).eq('id', mesaId).eq('empresa_id', empresaId)
   }
 
   return NextResponse.json({ result: data })
@@ -101,14 +108,15 @@ async function handleAddItemToComanda(params: {
   produtoId: string
   quantidade: number
   observacao?: string | null
-}) {
+}, empresaId: number) {
   const { comandaId, produtoId, quantidade, observacao } = params
 
-  // Buscar produto
+  // Buscar produto da mesma empresa
   const { data: produto, error: prodErr } = await supabaseAdmin
     .from('produtos')
     .select('*')
     .eq('id', produtoId)
+    .eq('empresa_id', empresaId)
     .single()
 
   if (prodErr || !produto) {
@@ -135,6 +143,7 @@ async function handleAddItemToComanda(params: {
       preco_unitario: produto.preco,
       subtotal,
       observacao: observacao || null,
+      empresa_id: empresaId,
     })
     .select('*, produto:produtos(*)')
     .single()
@@ -148,6 +157,7 @@ async function handleAddItemToComanda(params: {
       .from('produtos')
       .update({ estoque_atual: novoEstoque })
       .eq('id', produtoId)
+      .eq('empresa_id', empresaId)
 
     await supabaseAdmin.from('estoque_movimentos').insert({
       produto_id: produtoId,
@@ -157,6 +167,7 @@ async function handleAddItemToComanda(params: {
       estoque_posterior: novoEstoque,
       motivo: `Comanda #${comandaId}`,
       comanda_id: comandaId,
+      empresa_id: empresaId,
     })
   }
 
@@ -170,10 +181,10 @@ async function handleAddItemToComanda(params: {
 // PRODUTOS
 // ============================================
 
-async function handleCreateProduto(params: { produto: Record<string, unknown> }) {
+async function handleCreateProduto(params: { produto: Record<string, unknown> }, empresaId: number) {
   const { data, error } = await supabaseAdmin
     .from('produtos')
-    .insert(params.produto)
+    .insert({ ...params.produto, empresa_id: empresaId })
     .select()
     .single()
 
@@ -181,11 +192,12 @@ async function handleCreateProduto(params: { produto: Record<string, unknown> })
   return NextResponse.json({ result: data })
 }
 
-async function handleUpdateProduto(params: { id: string; updates: Record<string, unknown> }) {
+async function handleUpdateProduto(params: { id: string; updates: Record<string, unknown> }, empresaId: number) {
   const { data, error } = await supabaseAdmin
     .from('produtos')
     .update(params.updates)
     .eq('id', params.id)
+    .eq('empresa_id', empresaId)
     .select()
     .single()
 
@@ -193,22 +205,24 @@ async function handleUpdateProduto(params: { id: string; updates: Record<string,
   return NextResponse.json({ result: data })
 }
 
-async function handleToggleProdutoAtivo(params: { id: string; ativo: boolean }) {
+async function handleToggleProdutoAtivo(params: { id: string; ativo: boolean }, empresaId: number) {
   const { error } = await supabaseAdmin
     .from('produtos')
     .update({ ativo: params.ativo })
     .eq('id', params.id)
+    .eq('empresa_id', empresaId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ result: true })
 }
 
-async function handleDeleteProduto(params: { id: string }) {
+async function handleDeleteProduto(params: { id: string }, empresaId: number) {
   // Verificar se produto esta sendo usado em algum pedido
   const { count } = await supabaseAdmin
     .from('comanda_itens')
     .select('id', { count: 'exact', head: true })
     .eq('produto_id', params.id)
+    .eq('empresa_id', empresaId)
 
   if (count && count > 0) {
     return NextResponse.json(
@@ -222,6 +236,7 @@ async function handleDeleteProduto(params: { id: string }) {
     .from('produtos')
     .select('foto_url')
     .eq('id', params.id)
+    .eq('empresa_id', empresaId)
     .single()
 
   // Deletar produto primeiro (antes da foto, para evitar perda de dados)
@@ -229,6 +244,7 @@ async function handleDeleteProduto(params: { id: string }) {
     .from('produtos')
     .delete()
     .eq('id', params.id)
+    .eq('empresa_id', empresaId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -248,10 +264,10 @@ async function handleDeleteProduto(params: { id: string }) {
 // CLIENTES
 // ============================================
 
-async function handleCreateCliente(params: { cliente: Record<string, unknown> }) {
+async function handleCreateCliente(params: { cliente: Record<string, unknown> }, empresaId: number) {
   const { data, error } = await supabaseAdmin
     .from('clientes')
-    .insert(params.cliente)
+    .insert({ ...params.cliente, empresa_id: empresaId })
     .select()
     .single()
 
@@ -259,16 +275,51 @@ async function handleCreateCliente(params: { cliente: Record<string, unknown> })
   return NextResponse.json({ result: data })
 }
 
-async function handleUpdateCliente(params: { id: string; updates: Record<string, unknown> }) {
+async function handleUpdateCliente(params: { id: string; updates: Record<string, unknown> }, empresaId: number) {
   const { data, error } = await supabaseAdmin
     .from('clientes')
     .update(params.updates)
     .eq('id', params.id)
+    .eq('empresa_id', empresaId)
     .select()
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ result: data })
+}
+
+async function handleDeleteCliente(params: { id: string }, empresaId: number) {
+  // Verificar se cliente tem fiado aberto (nao pago)
+  const { count } = await supabaseAdmin
+    .from('comandas')
+    .select('id', { count: 'exact', head: true })
+    .eq('cliente_id', params.id)
+    .eq('empresa_id', empresaId)
+    .eq('fiado', true)
+    .eq('fiado_pago', false)
+
+  if (count && count > 0) {
+    return NextResponse.json(
+      { error: 'Este cliente possui pagamentos a prazo pendentes e nao pode ser excluido.' },
+      { status: 400 }
+    )
+  }
+
+  // Desvincular comandas antigas deste cliente (manter historico das comandas)
+  await supabaseAdmin
+    .from('comandas')
+    .update({ cliente_id: null })
+    .eq('cliente_id', params.id)
+    .eq('empresa_id', empresaId)
+
+  const { error } = await supabaseAdmin
+    .from('clientes')
+    .delete()
+    .eq('id', params.id)
+    .eq('empresa_id', empresaId)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ result: true })
 }
 
 // ============================================
@@ -280,12 +331,13 @@ async function handleCreateCaixaMovimento(params: {
   valor: number
   descricao: string
   forma_pagamento?: string
-}) {
-  // Vincular ao turno aberto
+}, empresaId: number) {
+  // Vincular ao turno aberto da empresa
   const { data: turno } = await supabaseAdmin
     .from('caixa_turnos')
     .select('id')
     .eq('status', 'aberto')
+    .eq('empresa_id', empresaId)
     .order('aberto_em', { ascending: false })
     .limit(1)
     .single()
@@ -295,6 +347,7 @@ async function handleCreateCaixaMovimento(params: {
     .insert({
       ...params,
       turno_id: turno?.id || null,
+      empresa_id: empresaId,
     })
     .select()
     .single()
@@ -307,7 +360,7 @@ async function handleFecharTurno(params: {
   turnoId: number
   valorFechamento: number
   observacao?: string
-}) {
+}, empresaId: number) {
   const { turnoId, valorFechamento, observacao } = params
 
   // Calcular totais
@@ -315,6 +368,7 @@ async function handleFecharTurno(params: {
     .from('caixa')
     .select('tipo, valor')
     .eq('turno_id', turnoId)
+    .eq('empresa_id', empresaId)
 
   let totalEntradas = 0
   let totalSaidas = 0
@@ -337,6 +391,7 @@ async function handleFecharTurno(params: {
       fechado_em: new Date().toISOString(),
     })
     .eq('id', turnoId)
+    .eq('empresa_id', empresaId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ result: true })
@@ -346,10 +401,10 @@ async function handleFecharTurno(params: {
 // MESAS
 // ============================================
 
-async function handleCreateMesa(params: { numero: number }) {
+async function handleCreateMesa(params: { numero: number }, empresaId: number) {
   const { data, error } = await supabaseAdmin
     .from('mesas')
-    .insert({ numero: params.numero, status: 'livre' })
+    .insert({ numero: params.numero, status: 'livre', empresa_id: empresaId })
     .select()
     .single()
 
@@ -357,21 +412,23 @@ async function handleCreateMesa(params: { numero: number }) {
   return NextResponse.json({ result: data })
 }
 
-async function handleUpdateMesaStatus(params: { id: number; status: string }) {
+async function handleUpdateMesaStatus(params: { id: number; status: string }, empresaId: number) {
   const { error } = await supabaseAdmin
     .from('mesas')
     .update({ status: params.status })
     .eq('id', params.id)
+    .eq('empresa_id', empresaId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ result: true })
 }
 
-async function handleDeleteMesa(params: { id: number }) {
+async function handleDeleteMesa(params: { id: number }, empresaId: number) {
   const { error } = await supabaseAdmin
     .from('mesas')
     .delete()
     .eq('id', params.id)
+    .eq('empresa_id', empresaId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ result: true })
@@ -385,13 +442,14 @@ async function handleEntradaEstoque(params: {
   produtoId: string
   quantidade: number
   motivo?: string
-}) {
+}, empresaId: number) {
   const { produtoId, quantidade, motivo } = params
 
   const { data: produto } = await supabaseAdmin
     .from('produtos')
     .select('estoque_atual')
     .eq('id', produtoId)
+    .eq('empresa_id', empresaId)
     .single()
 
   if (!produto) return NextResponse.json({ error: 'Produto nao encontrado' }, { status: 404 })
@@ -402,6 +460,7 @@ async function handleEntradaEstoque(params: {
     .from('produtos')
     .update({ estoque_atual: novoEstoque })
     .eq('id', produtoId)
+    .eq('empresa_id', empresaId)
 
   await supabaseAdmin.from('estoque_movimentos').insert({
     produto_id: produtoId,
@@ -410,6 +469,7 @@ async function handleEntradaEstoque(params: {
     estoque_anterior: produto.estoque_atual || 0,
     estoque_posterior: novoEstoque,
     motivo: motivo || 'Entrada de mercadoria',
+    empresa_id: empresaId,
   })
 
   return NextResponse.json({ result: true })
@@ -419,13 +479,14 @@ async function handleAjusteEstoque(params: {
   produtoId: string
   novaQuantidade: number
   motivo: string
-}) {
+}, empresaId: number) {
   const { produtoId, novaQuantidade, motivo } = params
 
   const { data: produto } = await supabaseAdmin
     .from('produtos')
     .select('estoque_atual')
     .eq('id', produtoId)
+    .eq('empresa_id', empresaId)
     .single()
 
   if (!produto) return NextResponse.json({ error: 'Produto nao encontrado' }, { status: 404 })
@@ -436,6 +497,7 @@ async function handleAjusteEstoque(params: {
     .from('produtos')
     .update({ estoque_atual: novaQuantidade })
     .eq('id', produtoId)
+    .eq('empresa_id', empresaId)
 
   await supabaseAdmin.from('estoque_movimentos').insert({
     produto_id: produtoId,
@@ -444,6 +506,7 @@ async function handleAjusteEstoque(params: {
     estoque_anterior: produto.estoque_atual || 0,
     estoque_posterior: novaQuantidade,
     motivo,
+    empresa_id: empresaId,
   })
 
   return NextResponse.json({ result: true })
@@ -458,7 +521,7 @@ async function handleRegistrarMovimentoEstoque(params: {
   motivo?: string
   comanda_id?: string
   usuario_id?: string
-}) {
+}, empresaId: number) {
   await supabaseAdmin.from('estoque_movimentos').insert({
     produto_id: params.produto_id,
     tipo: params.tipo,
@@ -468,6 +531,7 @@ async function handleRegistrarMovimentoEstoque(params: {
     motivo: params.motivo || null,
     comanda_id: params.comanda_id || null,
     usuario_id: params.usuario_id || null,
+    empresa_id: empresaId,
   })
 
   return NextResponse.json({ result: true })
@@ -477,11 +541,11 @@ async function handleRegistrarMovimentoEstoque(params: {
 // EMPRESA
 // ============================================
 
-async function handleUpdateEmpresa(params: { updates: Record<string, unknown> }) {
+async function handleUpdateEmpresa(params: { updates: Record<string, unknown> }, empresaId: number) {
   const { data, error } = await supabaseAdmin
     .from('empresa')
     .update({ ...params.updates, updated_at: new Date().toISOString() })
-    .eq('id', 1)
+    .eq('id', empresaId)
     .select()
     .single()
 
@@ -496,14 +560,15 @@ async function handleUpdateEmpresa(params: { updates: Record<string, unknown> })
 async function handleReceberFiado(params: {
   comandaId: string
   formaPagamentoRecebimento: string
-}) {
+}, empresaId: number) {
   const { comandaId, formaPagamentoRecebimento } = params
 
-  // Buscar comanda
+  // Buscar comanda da mesma empresa
   const { data: comanda, error: fetchErr } = await supabaseAdmin
     .from('comandas')
     .select('*')
     .eq('id', comandaId)
+    .eq('empresa_id', empresaId)
     .single()
 
   if (fetchErr || !comanda) {
@@ -522,14 +587,16 @@ async function handleReceberFiado(params: {
       fiado_pago_em: new Date().toISOString(),
     })
     .eq('id', comandaId)
+    .eq('empresa_id', empresaId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Agora sim registrar entrada no caixa
+  // Registrar entrada no caixa
   const { data: turno } = await supabaseAdmin
     .from('caixa_turnos')
     .select('id')
     .eq('status', 'aberto')
+    .eq('empresa_id', empresaId)
     .order('aberto_em', { ascending: false })
     .limit(1)
     .single()
@@ -541,6 +608,7 @@ async function handleReceberFiado(params: {
     forma_pagamento: formaPagamentoRecebimento,
     comanda_id: comandaId,
     turno_id: turno?.id || null,
+    empresa_id: empresaId,
   })
 
   return NextResponse.json({ result: true })
@@ -554,7 +622,7 @@ async function handleUpdateItemQuantidade(params: {
   itemId: string
   novaQuantidade: number
   comandaId: string
-}) {
+}, empresaId: number) {
   const { itemId, novaQuantidade, comandaId } = params
 
   if (novaQuantidade < 1) {
@@ -566,6 +634,7 @@ async function handleUpdateItemQuantidade(params: {
     .from('comanda_itens')
     .select('*, produto:produtos(*)')
     .eq('id', itemId)
+    .eq('empresa_id', empresaId)
     .single()
 
   if (itemErr || !item) {
@@ -593,18 +662,20 @@ async function handleUpdateItemQuantidade(params: {
     .from('comanda_itens')
     .update({ quantidade: novaQuantidade, subtotal: novoSubtotal })
     .eq('id', itemId)
+    .eq('empresa_id', empresaId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Ajustar estoque se necessario
   if (produto?.controlar_estoque && diferenca !== 0) {
     const estoqueAtual = produto.estoque_atual || 0
-    const novoEstoque = estoqueAtual - diferenca // incrementou qty → decrementa estoque
+    const novoEstoque = estoqueAtual - diferenca
 
     await supabaseAdmin
       .from('produtos')
       .update({ estoque_atual: novoEstoque })
       .eq('id', item.produto_id)
+      .eq('empresa_id', empresaId)
 
     await supabaseAdmin.from('estoque_movimentos').insert({
       produto_id: item.produto_id,
@@ -616,6 +687,7 @@ async function handleUpdateItemQuantidade(params: {
         ? `Incremento qty comanda #${comandaId}`
         : `Decremento qty comanda #${comandaId}`,
       comanda_id: comandaId,
+      empresa_id: empresaId,
     })
   }
 

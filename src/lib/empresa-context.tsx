@@ -1,7 +1,8 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import { getEmpresa } from '@/lib/supabase-helpers'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
 import type { Empresa } from '@/lib/types'
 
 interface EmpresaContextType {
@@ -17,6 +18,7 @@ const EmpresaContext = createContext<EmpresaContextType>({
 })
 
 export function EmpresaProvider({ children }: { children: React.ReactNode }) {
+  const { empresaId } = useAuth()
   const [empresa, setEmpresa] = useState<Empresa | null>(() => {
     // Carregar do cache local para render instantaneo
     if (typeof window !== 'undefined') {
@@ -28,20 +30,29 @@ export function EmpresaProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(!empresa)
 
   const refresh = useCallback(async () => {
+    if (!empresaId) return
     try {
-      const data = await getEmpresa()
-      setEmpresa(data)
+      // Buscar empresa pelo empresaId do usuario logado (RLS filtra automaticamente)
+      const { data } = await supabase
+        .from('empresa')
+        .select('*')
+        .eq('id', empresaId)
+        .single()
+
+      setEmpresa(data as Empresa | null)
       if (data) sessionStorage.setItem('empresa', JSON.stringify(data))
     } catch (error) {
       console.error('Erro ao carregar empresa:', error)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [empresaId])
 
   useEffect(() => {
-    refresh()
-  }, [refresh])
+    if (empresaId) {
+      refresh()
+    }
+  }, [empresaId, refresh])
 
   return (
     <EmpresaContext.Provider value={{ empresa, loading, refresh }}>

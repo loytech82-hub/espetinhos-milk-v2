@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-server'
+import { supabaseAdmin, getRequestContext } from '@/lib/supabase-server'
 
 // POST /api/comandas/[id] — Fechar comanda (receber pagamento)
 export async function POST(
@@ -9,13 +9,16 @@ export async function POST(
   const { id } = await params
 
   try {
+    const ctx = await getRequestContext(request)
+    const empresaId = ctx.empresaId
     const { formaPagamento, desconto, clienteId, prazoDias } = await request.json()
 
-    // Buscar comanda
+    // Buscar comanda da mesma empresa
     const { data: comanda, error: fetchErr } = await supabaseAdmin
       .from('comandas')
       .select('*')
       .eq('id', id)
+      .eq('empresa_id', empresaId)
       .single()
 
     if (fetchErr || !comanda) {
@@ -59,6 +62,7 @@ export async function POST(
         .from('clientes')
         .select('nome')
         .eq('id', clienteId)
+        .eq('empresa_id', empresaId)
         .single()
       if (cliente) updateData.cliente_nome = cliente.nome
     }
@@ -67,6 +71,7 @@ export async function POST(
       .from('comandas')
       .update(updateData)
       .eq('id', id)
+      .eq('empresa_id', empresaId)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
@@ -78,6 +83,7 @@ export async function POST(
         .from('caixa_turnos')
         .select('id')
         .eq('status', 'aberto')
+        .eq('empresa_id', empresaId)
         .order('aberto_em', { ascending: false })
         .limit(1)
         .single()
@@ -89,12 +95,13 @@ export async function POST(
         forma_pagamento: formaPagamento,
         comanda_id: id,
         turno_id: turno?.id || null,
+        empresa_id: empresaId,
       })
     }
 
     // Liberar mesa
     if (comanda.tipo === 'mesa' && comanda.mesa_id) {
-      await supabaseAdmin.from('mesas').update({ status: 'livre' }).eq('id', comanda.mesa_id)
+      await supabaseAdmin.from('mesas').update({ status: 'livre' }).eq('id', comanda.mesa_id).eq('empresa_id', empresaId)
     }
 
     return NextResponse.json({ success: true })
@@ -111,6 +118,8 @@ export async function PUT(
   const { id: comandaId } = await params
 
   try {
+    const ctx = await getRequestContext(request)
+    const empresaId = ctx.empresaId
     const { itemId } = await request.json()
 
     // Buscar item para restaurar estoque
@@ -118,6 +127,7 @@ export async function PUT(
       .from('comanda_itens')
       .select('*, produto:produtos(*)')
       .eq('id', itemId)
+      .eq('empresa_id', empresaId)
       .single()
 
     if (!item) {
@@ -125,7 +135,7 @@ export async function PUT(
     }
 
     // Deletar item
-    const { error } = await supabaseAdmin.from('comanda_itens').delete().eq('id', itemId)
+    const { error } = await supabaseAdmin.from('comanda_itens').delete().eq('id', itemId).eq('empresa_id', empresaId)
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
@@ -137,6 +147,7 @@ export async function PUT(
         .from('produtos')
         .update({ estoque_atual: novoEstoque })
         .eq('id', item.produto_id)
+        .eq('empresa_id', empresaId)
 
       // Registrar movimentacao
       await supabaseAdmin.from('estoque_movimentos').insert({
@@ -147,6 +158,7 @@ export async function PUT(
         estoque_posterior: novoEstoque,
         motivo: `Item removido da comanda`,
         comanda_id: comandaId,
+        empresa_id: empresaId,
       })
     }
 
@@ -167,17 +179,21 @@ export async function PUT(
 
 // DELETE /api/comandas/[id] — Excluir comanda e registros relacionados
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
 
   try {
-    // Buscar comanda
+    const ctx = await getRequestContext(request)
+    const empresaId = ctx.empresaId
+
+    // Buscar comanda da mesma empresa
     const { data: comanda, error: fetchErr } = await supabaseAdmin
       .from('comandas')
       .select('*')
       .eq('id', id)
+      .eq('empresa_id', empresaId)
       .single()
 
     if (fetchErr || !comanda) {
@@ -190,6 +206,7 @@ export async function DELETE(
         .from('comanda_itens')
         .select('*, produto:produtos(*)')
         .eq('comanda_id', id)
+        .eq('empresa_id', empresaId)
 
       if (itens) {
         for (const item of itens) {
@@ -199,23 +216,24 @@ export async function DELETE(
               .from('produtos')
               .update({ estoque_atual: novoEstoque })
               .eq('id', item.produto_id)
+              .eq('empresa_id', empresaId)
           }
         }
       }
 
       // Liberar mesa
       if (comanda.mesa_id) {
-        await supabaseAdmin.from('mesas').update({ status: 'livre' }).eq('id', comanda.mesa_id)
+        await supabaseAdmin.from('mesas').update({ status: 'livre' }).eq('id', comanda.mesa_id).eq('empresa_id', empresaId)
       }
     }
 
     // Deletar registros relacionados (ordem: dependentes primeiro)
-    await supabaseAdmin.from('caixa').delete().eq('comanda_id', id)
-    await supabaseAdmin.from('estoque_movimentos').delete().eq('comanda_id', id)
-    await supabaseAdmin.from('comanda_itens').delete().eq('comanda_id', id)
+    await supabaseAdmin.from('caixa').delete().eq('comanda_id', id).eq('empresa_id', empresaId)
+    await supabaseAdmin.from('estoque_movimentos').delete().eq('comanda_id', id).eq('empresa_id', empresaId)
+    await supabaseAdmin.from('comanda_itens').delete().eq('comanda_id', id).eq('empresa_id', empresaId)
 
     // Deletar a comanda
-    const { error } = await supabaseAdmin.from('comandas').delete().eq('id', id)
+    const { error } = await supabaseAdmin.from('comandas').delete().eq('id', id).eq('empresa_id', empresaId)
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
@@ -228,17 +246,21 @@ export async function DELETE(
 
 // PATCH /api/comandas/[id] — Cancelar comanda (restaura estoque, libera mesa)
 export async function PATCH(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
 
   try {
-    // Buscar comanda
+    const ctx = await getRequestContext(request)
+    const empresaId = ctx.empresaId
+
+    // Buscar comanda da mesma empresa
     const { data: comanda, error: fetchErr } = await supabaseAdmin
       .from('comandas')
       .select('*')
       .eq('id', id)
+      .eq('empresa_id', empresaId)
       .single()
 
     if (fetchErr || !comanda) {
@@ -254,6 +276,7 @@ export async function PATCH(
       .from('comanda_itens')
       .select('*, produto:produtos(*)')
       .eq('comanda_id', id)
+      .eq('empresa_id', empresaId)
 
     if (itens) {
       for (const item of itens) {
@@ -263,6 +286,7 @@ export async function PATCH(
             .from('produtos')
             .update({ estoque_atual: novoEstoque })
             .eq('id', item.produto_id)
+            .eq('empresa_id', empresaId)
         }
       }
     }
@@ -272,6 +296,7 @@ export async function PATCH(
       .from('comandas')
       .update({ status: 'cancelada', fechada_em: new Date().toISOString() })
       .eq('id', id)
+      .eq('empresa_id', empresaId)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
@@ -279,7 +304,7 @@ export async function PATCH(
 
     // Liberar mesa
     if (comanda.mesa_id) {
-      await supabaseAdmin.from('mesas').update({ status: 'livre' }).eq('id', comanda.mesa_id)
+      await supabaseAdmin.from('mesas').update({ status: 'livre' }).eq('id', comanda.mesa_id).eq('empresa_id', empresaId)
     }
 
     return NextResponse.json({ success: true })
