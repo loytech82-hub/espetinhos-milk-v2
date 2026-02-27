@@ -30,12 +30,20 @@ export default function DashboardPage() {
     loadDashboard()
   }, [])
 
+  // Data local formatada como YYYY-MM-DD (sem usar toISOString que converte para UTC)
+  function toLocalDate(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
   async function loadDashboard() {
     try {
-      const hoje = new Date().toISOString().split('T')[0]
-      const seteDiasAtras = new Date()
+      // Meia-noite LOCAL de hoje (como ISO string para o Supabase)
+      const agora = new Date()
+      const hojeLocal = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate())
+      const hoje = hojeLocal.toISOString()
+      const seteDiasAtras = new Date(hojeLocal)
       seteDiasAtras.setDate(seteDiasAtras.getDate() - 6)
-      const dataInicio = seteDiasAtras.toISOString().split('T')[0]
+      const dataInicio = seteDiasAtras.toISOString()
 
       // Todas as queries em paralelo (era sequencial, ~4s → ~500ms)
       const [
@@ -68,10 +76,10 @@ export default function DashboardPage() {
       setProdutosBaixo(baixo)
       if (fiadosData) setFiadosPendentes(fiadosData.reduce((acc, f) => acc + (f.total || 0), 0))
 
-      // Agrupar vendas por dia
+      // Agrupar vendas por dia (usando data local, nao UTC)
       const vendasPorDia = new Map<string, number>()
       vendasSemanaData?.forEach(v => {
-        const dia = v.aberta_em.split('T')[0]
+        const dia = toLocalDate(new Date(v.aberta_em))
         vendasPorDia.set(dia, (vendasPorDia.get(dia) || 0) + (v.total || 0))
       })
 
@@ -79,7 +87,7 @@ export default function DashboardPage() {
       for (let i = 6; i >= 0; i--) {
         const d = new Date()
         d.setDate(d.getDate() - i)
-        const diaStr = d.toISOString().split('T')[0]
+        const diaStr = toLocalDate(d)
         dias.push({
           label: d.toLocaleDateString('pt-BR', { weekday: 'short' }).slice(0, 3),
           value: vendasPorDia.get(diaStr) || 0,
