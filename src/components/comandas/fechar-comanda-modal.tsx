@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/lib/toast-context'
 import { formatCurrency } from '@/lib/utils'
-import { Banknote, QrCode, CreditCard, Percent } from 'lucide-react'
+import { Banknote, QrCode, CreditCard, Percent, Clock } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import type { Cliente } from '@/lib/types'
 
 interface FecharComandaModalProps {
   open: boolean
@@ -21,6 +23,13 @@ const formasPagamento = [
   { value: 'pix', label: 'PIX', icon: QrCode },
   { value: 'cartao_debito', label: 'Debito', icon: CreditCard },
   { value: 'cartao_credito', label: 'Credito', icon: CreditCard },
+  { value: 'fiado', label: 'A Prazo', icon: Clock },
+]
+
+const prazosOpcoes = [
+  { value: 7, label: '7 dias' },
+  { value: 15, label: '15 dias' },
+  { value: 30, label: '30 dias' },
 ]
 
 export function FecharComandaModal({ open, onOpenChange, comandaId, subtotal, onClosed }: FecharComandaModalProps) {
@@ -29,6 +38,18 @@ export function FecharComandaModal({ open, onOpenChange, comandaId, subtotal, on
   const [valorRecebido, setValorRecebido] = useState('')
   const [loading, setLoading] = useState(false)
   const [descontoStr, setDescontoStr] = useState('')
+  const [clientes, setClientes] = useState<Cliente[]>([])
+  const [clienteId, setClienteId] = useState('')
+  const [prazoDias, setPrazoDias] = useState<number | null>(null)
+
+  // Carregar clientes ao abrir (para fiado)
+  useEffect(() => {
+    if (open) {
+      supabase.from('clientes').select('*').order('nome').then(({ data }) => {
+        if (data) setClientes(data)
+      })
+    }
+  }, [open])
 
   // Reset ao fechar
   useEffect(() => {
@@ -36,6 +57,8 @@ export function FecharComandaModal({ open, onOpenChange, comandaId, subtotal, on
       setFormaPagamento('pix')
       setValorRecebido('')
       setDescontoStr('')
+      setClienteId('')
+      setPrazoDias(null)
     }
   }, [open])
 
@@ -46,9 +69,16 @@ export function FecharComandaModal({ open, onOpenChange, comandaId, subtotal, on
     ? Math.max(0, parseFloat(valorRecebido) - totalFinal)
     : 0
 
+  const isFiado = formaPagamento === 'fiado'
+
   async function handleFechar() {
     if (totalFinal <= 0) {
       toast('Total deve ser maior que zero', 'error')
+      return
+    }
+
+    if (isFiado && !clienteId) {
+      toast('Selecione um cliente para venda a prazo', 'error')
       return
     }
 
@@ -62,10 +92,16 @@ export function FecharComandaModal({ open, onOpenChange, comandaId, subtotal, on
 
     setLoading(true)
     try {
+      const body: Record<string, unknown> = { formaPagamento, desconto }
+      if (isFiado) {
+        body.clienteId = clienteId
+        body.prazoDias = prazoDias
+      }
+
       const res = await fetch(`/api/comandas/${comandaId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formaPagamento, desconto }),
+        body: JSON.stringify(body),
       })
       const data = await res.json()
 
@@ -74,7 +110,7 @@ export function FecharComandaModal({ open, onOpenChange, comandaId, subtotal, on
         return
       }
 
-      toast('Pagamento recebido!', 'success')
+      toast(isFiado ? 'Venda a prazo registrada!' : 'Pagamento recebido!', 'success')
       onOpenChange(false)
       onClosed()
     } catch (err: unknown) {
@@ -142,6 +178,44 @@ export function FecharComandaModal({ open, onOpenChange, comandaId, subtotal, on
           ))}
         </div>
 
+        {/* Opcoes de fiado */}
+        {isFiado && (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs text-text-muted mb-1.5">Cliente (obrigatorio)</label>
+              <select
+                value={clienteId}
+                onChange={e => setClienteId(e.target.value)}
+                className="w-full h-10 px-3 bg-bg-elevated border border-bg-placeholder rounded-xl text-sm text-text-white focus:outline-none focus:ring-1 focus:ring-orange/40"
+              >
+                <option value="">Selecione um cliente...</option>
+                {clientes.map(c => (
+                  <option key={c.id} value={c.id}>{c.nome}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted mb-1.5">Prazo (opcional)</label>
+              <div className="flex gap-2">
+                {prazosOpcoes.map(p => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setPrazoDias(prazoDias === p.value ? null : p.value)}
+                    className={`flex-1 h-9 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                      prazoDias === p.value
+                        ? 'bg-orange text-text-dark'
+                        : 'bg-bg-elevated text-text-muted hover:bg-bg-placeholder'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Valor recebido (somente dinheiro) */}
         {formaPagamento === 'dinheiro' && (
           <div className="space-y-3">
@@ -170,8 +244,8 @@ export function FecharComandaModal({ open, onOpenChange, comandaId, subtotal, on
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleFechar} loading={loading} variant="success">
-            Confirmar Pagamento
+          <Button onClick={handleFechar} loading={loading} variant={isFiado ? 'primary' : 'success'}>
+            {isFiado ? 'Registrar Venda a Prazo' : 'Confirmar Pagamento'}
           </Button>
         </div>
       </div>

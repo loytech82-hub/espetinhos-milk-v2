@@ -42,8 +42,9 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
   const [addLoading, setAddLoading] = useState(false)
   const [continuarAdicionando, setContinuarAdicionando] = useState(false)
 
-  // Remover item
+  // Remover item / atualizar quantidade
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
 
   // Fechar/cancelar
   const [fecharOpen, setFecharOpen] = useState(false)
@@ -167,6 +168,52 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
       toast((err as Error).message, 'error')
     } finally {
       setAddLoading(false)
+    }
+  }
+
+  // Recarregar itens e comanda (reutilizado em varias funcoes)
+  async function reloadItensEComanda() {
+    if (!comanda) return
+    const { data: itensData } = await supabase
+      .from('comanda_itens')
+      .select('*, produto:produtos(*)')
+      .eq('comanda_id', comanda.id)
+      .order('created_at', { ascending: true })
+    if (itensData) setItens(itensData)
+
+    const { data: comandaData } = await supabase
+      .from('comandas')
+      .select('*')
+      .eq('id', comanda.id)
+      .single()
+    if (comandaData) setComanda(comandaData)
+  }
+
+  // Atualizar quantidade de item (+/-)
+  async function handleUpdateQuantidade(item: ComandaItem, delta: number) {
+    if (!comanda) return
+    const novaQtd = item.quantidade + delta
+    if (novaQtd <= 0) {
+      handleRemoveItem(item.id)
+      return
+    }
+    setUpdatingId(item.id)
+    try {
+      const res = await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'updateItemQuantidade',
+          params: { itemId: item.id, novaQuantidade: novaQtd, comandaId: comanda.id },
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erro ao atualizar quantidade')
+      await reloadItensEComanda()
+    } catch (err: unknown) {
+      toast((err as Error).message, 'error')
+    } finally {
+      setUpdatingId(null)
     }
   }
 
@@ -506,34 +553,50 @@ export function MesaPanel({ mesa, onClose, onMesaUpdated }: MesaPanelProps) {
                 </div>
               ) : (
                 <div className="rounded-2xl overflow-hidden space-y-px">
-                  {itens.map(item => (
-                    <div key={item.id} className="flex items-center justify-between gap-3 px-4 py-3 bg-bg-card">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-bg-placeholder flex items-center justify-center shrink-0">
-                          <Package size={12} className="text-text-muted" />
-                        </div>
+                  {itens.map(item => {
+                    const isBusy = updatingId === item.id || removingId === item.id
+                    return (
+                      <div key={item.id} className="flex items-center gap-3 px-4 py-3 bg-bg-card">
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] text-text-white font-medium truncate">
                             {(item.produto as unknown as Produto)?.nome || 'Produto'}
                           </p>
                           <p className="text-xs text-text-muted">
-                            {item.quantidade}x {formatCurrency(item.preco_unitario)}
+                            {formatCurrency(item.preco_unitario)} un.
                             {item.observacao && ` · ${item.observacao}`}
                           </p>
                         </div>
+                        {/* Botoes +/- quantidade */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            onClick={() => handleUpdateQuantidade(item, -1)}
+                            disabled={isBusy}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-bg-elevated hover:bg-bg-placeholder transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="font-mono text-sm font-bold w-5 text-center">{item.quantidade}</span>
+                          <button
+                            onClick={() => handleUpdateQuantidade(item, 1)}
+                            disabled={isBusy}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-bg-elevated hover:bg-bg-placeholder transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <span className="font-heading text-sm text-text-white font-bold shrink-0 min-w-[60px] text-right">
+                          {formatCurrency(item.subtotal)}
+                        </span>
+                        <button
+                          onClick={() => handleRemoveItem(item.id)}
+                          disabled={isBusy}
+                          className="text-text-muted hover:text-danger transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
-                      <span className="font-heading text-sm text-text-white font-bold shrink-0">
-                        {formatCurrency(item.subtotal)}
-                      </span>
-                      <button
-                        onClick={() => handleRemoveItem(item.id)}
-                        disabled={removingId === item.id}
-                        className="text-text-muted hover:text-danger transition-colors cursor-pointer disabled:opacity-50 shrink-0"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
 

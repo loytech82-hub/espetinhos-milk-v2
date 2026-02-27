@@ -16,12 +16,16 @@ export interface Comanda {
   total: number
   desconto: number
   taxa_servico: number
-  forma_pagamento: 'dinheiro' | 'pix' | 'cartao_debito' | 'cartao_credito' | null
+  forma_pagamento: 'dinheiro' | 'pix' | 'cartao_debito' | 'cartao_credito' | 'fiado' | null
   cliente_nome: string | null
   cliente_id: string | null
   usuario_id: string | null
   aberta_em: string
   fechada_em: string | null
+  fiado: boolean
+  fiado_pago: boolean
+  fiado_pago_em: string | null
+  fiado_prazo_dias: number | null
 }
 
 export interface ComandaItem {

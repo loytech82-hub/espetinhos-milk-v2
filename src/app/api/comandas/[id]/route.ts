@@ -9,7 +9,7 @@ export async function POST(
   const { id } = await params
 
   try {
-    const { formaPagamento, desconto } = await request.json()
+    const { formaPagamento, desconto, clienteId, prazoDias } = await request.json()
 
     // Buscar comanda
     const { data: comanda, error: fetchErr } = await supabaseAdmin
@@ -28,42 +28,69 @@ export async function POST(
 
     const desc = desconto ?? 0
     const totalFinal = comanda.total - desc
+    const isFiado = formaPagamento === 'fiado'
+
+    // Validacao: fiado exige cliente
+    if (isFiado && !clienteId) {
+      return NextResponse.json({ error: 'Venda a prazo exige selecionar um cliente' }, { status: 400 })
+    }
 
     // Fechar comanda
+    const updateData: Record<string, unknown> = {
+      status: 'fechada',
+      forma_pagamento: formaPagamento,
+      taxa_servico: 0,
+      desconto: desc,
+      total: totalFinal,
+      fechada_em: new Date().toISOString(),
+    }
+
+    if (isFiado) {
+      updateData.fiado = true
+      updateData.fiado_pago = false
+      updateData.fiado_prazo_dias = prazoDias || null
+      updateData.cliente_id = clienteId
+    }
+
+    if (clienteId) {
+      updateData.cliente_id = clienteId
+      // Buscar nome do cliente
+      const { data: cliente } = await supabaseAdmin
+        .from('clientes')
+        .select('nome')
+        .eq('id', clienteId)
+        .single()
+      if (cliente) updateData.cliente_nome = cliente.nome
+    }
+
     const { error } = await supabaseAdmin
       .from('comandas')
-      .update({
-        status: 'fechada',
-        forma_pagamento: formaPagamento,
-        taxa_servico: 0,
-        desconto: desc,
-        total: totalFinal,
-        fechada_em: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Buscar turno aberto
-    const { data: turno } = await supabaseAdmin
-      .from('caixa_turnos')
-      .select('id')
-      .eq('status', 'aberto')
-      .order('aberto_em', { ascending: false })
-      .limit(1)
-      .single()
+    // Registrar entrada no caixa SOMENTE se nao for fiado
+    if (!isFiado) {
+      const { data: turno } = await supabaseAdmin
+        .from('caixa_turnos')
+        .select('id')
+        .eq('status', 'aberto')
+        .order('aberto_em', { ascending: false })
+        .limit(1)
+        .single()
 
-    // Registrar entrada no caixa
-    await supabaseAdmin.from('caixa').insert({
-      tipo: 'entrada',
-      valor: totalFinal,
-      descricao: `Comanda #${comanda.numero} (${comanda.tipo})`,
-      forma_pagamento: formaPagamento,
-      comanda_id: id,
-      turno_id: turno?.id || null,
-    })
+      await supabaseAdmin.from('caixa').insert({
+        tipo: 'entrada',
+        valor: totalFinal,
+        descricao: `Comanda #${comanda.numero} (${comanda.tipo})`,
+        forma_pagamento: formaPagamento,
+        comanda_id: id,
+        turno_id: turno?.id || null,
+      })
+    }
 
     // Liberar mesa
     if (comanda.tipo === 'mesa' && comanda.mesa_id) {

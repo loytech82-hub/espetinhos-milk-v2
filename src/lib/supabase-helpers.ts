@@ -38,6 +38,15 @@ export async function addItemToComanda(
   return apiCall<ComandaItem>('addItemToComanda', { comandaId, produtoId, quantidade, observacao })
 }
 
+// Atualizar quantidade de item na comanda (via API)
+export async function updateItemQuantidade(
+  itemId: string,
+  novaQuantidade: number,
+  comandaId: string
+): Promise<void> {
+  await apiCall('updateItemQuantidade', { itemId, novaQuantidade, comandaId })
+}
+
 // Remover item da comanda (via API dedicada)
 export async function removeItemFromComanda(
   itemId: string,
@@ -65,6 +74,31 @@ export async function closeComanda(
   })
   const data = await res.json()
   if (!res.ok || data.error) throw new Error(data.error || 'Erro ao fechar comanda')
+}
+
+// Fechar comanda como fiado (via API dedicada)
+export async function closeComandaFiado(
+  comandaId: string,
+  formaPagamento: string,
+  desconto: number,
+  clienteId: string,
+  prazoDias?: number
+): Promise<void> {
+  const res = await fetch(`/api/comandas/${comandaId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ formaPagamento, desconto, clienteId, prazoDias }),
+  })
+  const data = await res.json()
+  if (!res.ok || data.error) throw new Error(data.error || 'Erro ao fechar comanda como fiado')
+}
+
+// Receber pagamento de fiado (via API)
+export async function receberFiado(
+  comandaId: string,
+  formaPagamentoRecebimento: string
+): Promise<void> {
+  await apiCall('receberFiado', { comandaId, formaPagamentoRecebimento })
 }
 
 // Cancelar comanda (via API dedicada)

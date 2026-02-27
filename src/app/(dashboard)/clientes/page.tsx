@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react'
 import { Plus, Search, Users } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { formatCurrency } from '@/lib/utils'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ClienteModal } from '@/components/clientes/cliente-modal'
 import type { Cliente } from '@/lib/types'
 
 export default function ClientesPage() {
-  const [clientes, setClientes] = useState<(Cliente & { total_pedidos?: number })[]>([])
+  const [clientes, setClientes] = useState<(Cliente & { total_pedidos?: number; fiado_aberto?: number })[]>([])
   const [busca, setBusca] = useState('')
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -20,11 +21,25 @@ export default function ClientesPage() {
 
   async function loadClientes() {
     try {
-      const { data } = await supabase
-        .from('clientes')
-        .select('*')
-        .order('nome')
-      if (data) setClientes(data)
+      const [{ data: clientesData }, { data: fiadosData }] = await Promise.all([
+        supabase.from('clientes').select('*').order('nome'),
+        supabase.from('comandas').select('cliente_id, total').eq('fiado', true).eq('fiado_pago', false),
+      ])
+
+      // Agrupar fiados por cliente
+      const fiadosPorCliente = new Map<string, number>()
+      fiadosData?.forEach(f => {
+        if (f.cliente_id) {
+          fiadosPorCliente.set(f.cliente_id, (fiadosPorCliente.get(f.cliente_id) || 0) + (f.total || 0))
+        }
+      })
+
+      if (clientesData) {
+        setClientes(clientesData.map(c => ({
+          ...c,
+          fiado_aberto: fiadosPorCliente.get(c.id) || 0,
+        })))
+      }
     } catch {
       // Tabela pode nao existir ainda
     } finally {
@@ -80,10 +95,11 @@ export default function ClientesPage() {
         </div>
       ) : filtered.length > 0 ? (
         <div className="rounded-2xl overflow-hidden">
-          <div className="hidden sm:grid grid-cols-4 h-11 px-5 bg-bg-card items-center">
+          <div className="hidden sm:grid grid-cols-5 h-11 px-5 bg-bg-card items-center">
             <span className="text-xs text-text-muted">Nome</span>
             <span className="text-xs text-text-muted">Telefone</span>
             <span className="text-xs text-text-muted">Endereco</span>
+            <span className="text-xs text-text-muted">A Prazo</span>
             <span className="text-xs text-text-muted">Desde</span>
           </div>
           <div className="space-y-px">
@@ -91,7 +107,7 @@ export default function ClientesPage() {
               <div
                 key={cliente.id}
                 onClick={() => handleEdit(cliente)}
-                className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-5 py-4 sm:h-14 bg-bg-card items-center hover:bg-bg-elevated transition-colors cursor-pointer"
+                className="grid grid-cols-2 sm:grid-cols-5 gap-2 px-5 py-4 sm:h-14 bg-bg-card items-center hover:bg-bg-elevated transition-colors cursor-pointer"
               >
                 <span className="text-[13px] text-text-white font-medium">
                   {cliente.nome}
@@ -101,6 +117,9 @@ export default function ClientesPage() {
                 </span>
                 <span className="hidden sm:block text-[13px] text-text-muted truncate">
                   {cliente.endereco || '—'}
+                </span>
+                <span className={`hidden sm:block text-[13px] font-semibold ${cliente.fiado_aberto ? 'text-warning' : 'text-text-muted'}`}>
+                  {cliente.fiado_aberto ? formatCurrency(cliente.fiado_aberto) : '—'}
                 </span>
                 <span className="text-[13px] text-text-muted">
                   {new Date(cliente.created_at).toLocaleDateString('pt-BR')}

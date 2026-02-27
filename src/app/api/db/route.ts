@@ -39,6 +39,10 @@ export async function POST(request: NextRequest) {
         return await handleAjusteEstoque(params)
       case 'updateEmpresa':
         return await handleUpdateEmpresa(params)
+      case 'updateItemQuantidade':
+        return await handleUpdateItemQuantidade(params)
+      case 'receberFiado':
+        return await handleReceberFiado(params)
       case 'registrarMovimentoEstoque':
         return await handleRegistrarMovimentoEstoque(params)
       default:
@@ -483,6 +487,142 @@ async function handleUpdateEmpresa(params: { updates: Record<string, unknown> })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ result: data })
+}
+
+// ============================================
+// RECEBER PAGAMENTO DE FIADO
+// ============================================
+
+async function handleReceberFiado(params: {
+  comandaId: string
+  formaPagamentoRecebimento: string
+}) {
+  const { comandaId, formaPagamentoRecebimento } = params
+
+  // Buscar comanda
+  const { data: comanda, error: fetchErr } = await supabaseAdmin
+    .from('comandas')
+    .select('*')
+    .eq('id', comandaId)
+    .single()
+
+  if (fetchErr || !comanda) {
+    return NextResponse.json({ error: 'Comanda nao encontrada' }, { status: 404 })
+  }
+
+  if (!comanda.fiado || comanda.fiado_pago) {
+    return NextResponse.json({ error: 'Esta comanda nao tem pagamento pendente' }, { status: 400 })
+  }
+
+  // Marcar fiado como pago
+  const { error } = await supabaseAdmin
+    .from('comandas')
+    .update({
+      fiado_pago: true,
+      fiado_pago_em: new Date().toISOString(),
+    })
+    .eq('id', comandaId)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Agora sim registrar entrada no caixa
+  const { data: turno } = await supabaseAdmin
+    .from('caixa_turnos')
+    .select('id')
+    .eq('status', 'aberto')
+    .order('aberto_em', { ascending: false })
+    .limit(1)
+    .single()
+
+  await supabaseAdmin.from('caixa').insert({
+    tipo: 'entrada',
+    valor: comanda.total,
+    descricao: `Prazo recebido - Comanda #${comanda.numero}`,
+    forma_pagamento: formaPagamentoRecebimento,
+    comanda_id: comandaId,
+    turno_id: turno?.id || null,
+  })
+
+  return NextResponse.json({ result: true })
+}
+
+// ============================================
+// ATUALIZAR QUANTIDADE DE ITEM NA COMANDA
+// ============================================
+
+async function handleUpdateItemQuantidade(params: {
+  itemId: string
+  novaQuantidade: number
+  comandaId: string
+}) {
+  const { itemId, novaQuantidade, comandaId } = params
+
+  if (novaQuantidade < 1) {
+    return NextResponse.json({ error: 'Quantidade deve ser maior que zero' }, { status: 400 })
+  }
+
+  // Buscar item atual com produto
+  const { data: item, error: itemErr } = await supabaseAdmin
+    .from('comanda_itens')
+    .select('*, produto:produtos(*)')
+    .eq('id', itemId)
+    .single()
+
+  if (itemErr || !item) {
+    return NextResponse.json({ error: 'Item nao encontrado' }, { status: 404 })
+  }
+
+  const produto = item.produto
+  const quantidadeAnterior = item.quantidade
+  const diferenca = novaQuantidade - quantidadeAnterior
+
+  // Se incrementando, validar estoque
+  if (diferenca > 0 && produto?.controlar_estoque) {
+    if ((produto.estoque_atual || 0) < diferenca) {
+      return NextResponse.json(
+        { error: `Estoque insuficiente (disponivel: ${produto.estoque_atual || 0})` },
+        { status: 400 }
+      )
+    }
+  }
+
+  const novoSubtotal = item.preco_unitario * novaQuantidade
+
+  // Atualizar item
+  const { error } = await supabaseAdmin
+    .from('comanda_itens')
+    .update({ quantidade: novaQuantidade, subtotal: novoSubtotal })
+    .eq('id', itemId)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Ajustar estoque se necessario
+  if (produto?.controlar_estoque && diferenca !== 0) {
+    const estoqueAtual = produto.estoque_atual || 0
+    const novoEstoque = estoqueAtual - diferenca // incrementou qty → decrementa estoque
+
+    await supabaseAdmin
+      .from('produtos')
+      .update({ estoque_atual: novoEstoque })
+      .eq('id', item.produto_id)
+
+    await supabaseAdmin.from('estoque_movimentos').insert({
+      produto_id: item.produto_id,
+      tipo: diferenca > 0 ? 'venda' : 'cancelamento',
+      quantidade: Math.abs(diferenca),
+      estoque_anterior: estoqueAtual,
+      estoque_posterior: novoEstoque,
+      motivo: diferenca > 0
+        ? `Incremento qty comanda #${comandaId}`
+        : `Decremento qty comanda #${comandaId}`,
+      comanda_id: comandaId,
+    })
+  }
+
+  // Recalcular total da comanda
+  await recalcularTotal(comandaId)
+
+  return NextResponse.json({ result: true })
 }
 
 // ============================================

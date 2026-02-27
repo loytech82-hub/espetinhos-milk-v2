@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Plus, Trash2, CreditCard, XCircle, Printer } from 'lucide-react'
+import { ArrowLeft, Plus, Minus, Trash2, CreditCard, XCircle, Printer, Clock, CheckCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { useToast } from '@/lib/toast-context'
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { AddItemModal } from '@/components/comandas/add-item-modal'
 import { FecharComandaModal } from '@/components/comandas/fechar-comanda-modal'
+import { ReceberFiadoModal } from '@/components/comandas/receber-fiado-modal'
 import { printComanda } from '@/lib/print-comanda'
 import { useEmpresa } from '@/lib/empresa-context'
 import type { Comanda, ComandaItem, Produto } from '@/lib/types'
@@ -27,8 +28,10 @@ export default function ComandaDetalhePage() {
   const [addItemOpen, setAddItemOpen] = useState(false)
   const [fecharOpen, setFecharOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [receberFiadoOpen, setReceberFiadoOpen] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (params.id) loadComanda(params.id as string)
@@ -53,6 +56,33 @@ export default function ComandaDetalhePage() {
       console.error('Erro ao carregar pedido:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleUpdateQuantidade(item: ComandaItem, delta: number) {
+    if (!comanda) return
+    const novaQtd = item.quantidade + delta
+    if (novaQtd <= 0) {
+      handleRemoveItem(item.id)
+      return
+    }
+    setUpdatingId(item.id)
+    try {
+      const res = await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'updateItemQuantidade',
+          params: { itemId: item.id, novaQuantidade: novaQtd, comandaId: comanda.id },
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erro ao atualizar quantidade')
+      await loadComanda(comanda.id)
+    } catch (err: unknown) {
+      toast((err as Error).message, 'error')
+    } finally {
+      setUpdatingId(null)
     }
   }
 
@@ -182,34 +212,58 @@ export default function ComandaDetalhePage() {
         </div>
 
         <div className="rounded-2xl overflow-hidden space-y-px">
-          {itens.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center justify-between gap-4 px-5 py-4 bg-bg-card"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] text-text-white font-medium">
-                  {(item.produto as unknown as Produto)?.nome || 'Produto'}
-                </p>
-                <p className="text-xs text-text-muted">
-                  {item.quantidade}x {formatCurrency(item.preco_unitario)}
-                  {item.observacao && ` · ${item.observacao}`}
-                </p>
+          {itens.map((item) => {
+            const isBusy = updatingId === item.id || removingId === item.id
+            return (
+              <div
+                key={item.id}
+                className="flex items-center justify-between gap-4 px-5 py-4 bg-bg-card"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] text-text-white font-medium">
+                    {(item.produto as unknown as Produto)?.nome || 'Produto'}
+                  </p>
+                  <p className="text-xs text-text-muted">
+                    {formatCurrency(item.preco_unitario)} un.
+                    {item.observacao && ` · ${item.observacao}`}
+                  </p>
+                </div>
+                {isAberta ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleUpdateQuantidade(item, -1)}
+                      disabled={isBusy}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-bg-elevated hover:bg-bg-placeholder transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="font-mono text-sm font-bold w-6 text-center">{item.quantidade}</span>
+                    <button
+                      onClick={() => handleUpdateQuantidade(item, 1)}
+                      disabled={isBusy}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-bg-elevated hover:bg-bg-placeholder transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <span className="font-mono text-sm text-text-muted">{item.quantidade}x</span>
+                )}
+                <span className="font-heading text-[15px] text-text-white font-bold min-w-[70px] text-right">
+                  {formatCurrency(item.subtotal)}
+                </span>
+                {isAberta && (
+                  <button
+                    onClick={() => handleRemoveItem(item.id)}
+                    disabled={isBusy}
+                    className="text-text-muted hover:text-danger transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
-              <span className="font-heading text-[15px] text-text-white font-bold">
-                {formatCurrency(item.subtotal)}
-              </span>
-              {isAberta && (
-                <button
-                  onClick={() => handleRemoveItem(item.id)}
-                  disabled={removingId === item.id}
-                  className="text-text-muted hover:text-danger transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          ))}
+            )
+          })}
 
           {itens.length === 0 && (
             <div className="p-10 bg-bg-card text-center">
@@ -263,7 +317,24 @@ export default function ComandaDetalhePage() {
               </Button>
             </div>
           )}
-          {comanda.status === 'fechada' && comanda.forma_pagamento && (
+          {comanda.status === 'fechada' && comanda.fiado && !comanda.fiado_pago && (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-warning/20 rounded-xl">
+                <Clock className="w-4 h-4 text-warning" />
+                <span className="text-sm font-semibold text-warning">Pagamento Pendente</span>
+              </div>
+              <Button size="sm" variant="success" onClick={() => setReceberFiadoOpen(true)}>
+                Receber
+              </Button>
+            </div>
+          )}
+          {comanda.status === 'fechada' && comanda.fiado && comanda.fiado_pago && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-success/20 rounded-xl">
+              <CheckCircle className="w-4 h-4 text-success" />
+              <span className="text-sm font-semibold text-success">Pago</span>
+            </div>
+          )}
+          {comanda.status === 'fechada' && comanda.forma_pagamento && !comanda.fiado && (
             <div className="text-right">
               <span className="text-xs text-text-muted">Pago via</span>
               <p className="font-heading text-lg font-semibold text-success capitalize">
@@ -293,6 +364,17 @@ export default function ComandaDetalhePage() {
         subtotal={subtotalItens}
         onClosed={() => loadComanda(comanda.id)}
       />
+
+      {comanda.fiado && !comanda.fiado_pago && (
+        <ReceberFiadoModal
+          open={receberFiadoOpen}
+          onOpenChange={setReceberFiadoOpen}
+          comandaId={comanda.id}
+          total={comanda.total}
+          clienteNome={comanda.cliente_nome}
+          onRecebido={() => loadComanda(comanda.id)}
+        />
+      )}
 
       <ConfirmDialog
         open={cancelOpen}

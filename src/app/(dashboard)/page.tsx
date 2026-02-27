@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, ArrowUpCircle, ClipboardList, Wallet, AlertTriangle } from 'lucide-react'
+import { Plus, ArrowUpCircle, ClipboardList, Wallet, AlertTriangle, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, getGreeting } from '@/lib/utils'
 import { getProdutosEstoqueBaixo } from '@/lib/supabase-helpers'
@@ -21,6 +21,7 @@ export default function DashboardPage() {
   const [saldoCaixa, setSaldoCaixa] = useState(0)
   const [produtosBaixo, setProdutosBaixo] = useState<Produto[]>([])
   const [vendasSemana, setVendasSemana] = useState<{ label: string; value: number }[]>([])
+  const [fiadosPendentes, setFiadosPendentes] = useState(0)
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [mesaSelecionada, setMesaSelecionada] = useState<number | null>(null)
@@ -45,6 +46,7 @@ export default function DashboardPage() {
         { data: caixaData },
         baixo,
         { data: vendasSemanaData },
+        { data: fiadosData },
       ] = await Promise.all([
         supabase.from('mesas').select('*').order('numero'),
         supabase.from('comandas').select('id').eq('status', 'aberta'),
@@ -53,6 +55,7 @@ export default function DashboardPage() {
         supabase.from('caixa').select('tipo, valor').gte('created_at', hoje),
         getProdutosEstoqueBaixo(),
         supabase.from('comandas').select('total, aberta_em').eq('status', 'fechada').gte('aberta_em', dataInicio),
+        supabase.from('comandas').select('total').eq('fiado', true).eq('fiado_pago', false),
       ])
 
       if (mesasData) setMesas(mesasData)
@@ -63,6 +66,7 @@ export default function DashboardPage() {
         setSaldoCaixa(caixaData.reduce((acc, m) => m.tipo === 'entrada' ? acc + m.valor : acc - m.valor, 0))
       }
       setProdutosBaixo(baixo)
+      if (fiadosData) setFiadosPendentes(fiadosData.reduce((acc, f) => acc + (f.total || 0), 0))
 
       // Agrupar vendas por dia
       const vendasPorDia = new Map<string, number>()
@@ -143,8 +147,8 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {/* 3 Cards com hierarquia visual */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Cards com hierarquia visual */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="flex flex-col gap-3 p-5 bg-bg-card rounded-2xl border-l-4 border-success">
           <div className="flex items-center gap-2">
             <ArrowUpCircle className="w-4 h-4 text-success" />
@@ -172,6 +176,17 @@ export default function DashboardPage() {
             {formatCurrency(saldoCaixa)}
           </span>
         </div>
+        {fiadosPendentes > 0 && (
+          <div className="flex flex-col gap-3 p-5 bg-bg-card rounded-2xl border-l-4 border-warning">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-warning" />
+              <span className="text-xs text-text-muted">A Prazo (pendente)</span>
+            </div>
+            <span className="font-heading text-3xl font-bold text-warning">
+              {formatCurrency(fiadosPendentes)}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Grafico de vendas + Estoque baixo */}

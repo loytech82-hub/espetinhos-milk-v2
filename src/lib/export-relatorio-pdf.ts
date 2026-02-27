@@ -6,12 +6,14 @@ interface ResumoVendas {
   valorMedio: number
   formaPagamento: Record<string, number>
   topProdutos: { nome: string; qtd: number; total: number }[]
+  fiadosPendentes?: number
 }
 
 const fpLabels: Record<string, string> = {
   dinheiro: 'Dinheiro',
   pix: 'PIX',
   cartao: 'Cartao',
+  fiado: 'A Prazo',
   nao_informado: 'Outros',
 }
 

@@ -6,6 +6,7 @@ interface ResumoVendas {
   valorMedio: number
   formaPagamento: Record<string, number>
   topProdutos: { nome: string; qtd: number; total: number }[]
+  fiadosPendentes?: number
 }
 
 /**
@@ -23,6 +24,7 @@ export function printRelatorio(
     dinheiro: 'Dinheiro',
     pix: 'PIX',
     cartao: 'Cartao',
+    fiado: 'A Prazo',
     nao_informado: 'Outros',
   }
 
@@ -110,6 +112,12 @@ export function printRelatorio(
       <div class="card-value orange">${formatCurrency(resumo.valorMedio)}</div>
     </div>
   </div>
+
+  ${resumo.fiadosPendentes ? `
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-label">Vendas a Prazo (pendentes)</div>
+    <div class="card-value" style="color:#d97706">${formatCurrency(resumo.fiadosPendentes)}</div>
+  </div>` : ''}
 
   <h2>Por Forma de Pagamento</h2>
   <table>
