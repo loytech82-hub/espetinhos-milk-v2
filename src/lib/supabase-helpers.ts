@@ -111,6 +111,14 @@ export async function receberFiadoParcial(
   return apiCall<{ quitado: boolean }>('receberFiadoParcial', { comandaId, valor, formaPagamento, clienteId })
 }
 
+// Excluir um pagamento de fiado (lançamento errado)
+export async function excluirPagamentoFiado(
+  pagamentoId: string,
+  comandaId: string
+): Promise<{ success: boolean; valorExcluido: number }> {
+  return apiCall<{ success: boolean; valorExcluido: number }>('excluirPagamentoFiado', { pagamentoId, comandaId })
+}
+
 // Adicionar produtos a divida do cliente (via API)
 export async function addItemToClienteDebt(
   clienteId: string,

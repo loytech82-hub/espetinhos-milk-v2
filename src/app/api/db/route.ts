@@ -54,6 +54,8 @@ export async function POST(request: NextRequest) {
         return await handleReceberFiadoParcial(params, empresaId)
       case 'addItemToClienteDebt':
         return await handleAddItemToClienteDebt(params, empresaId)
+      case 'excluirPagamentoFiado':
+        return await handleExcluirPagamentoFiado(params, empresaId)
       default:
         return NextResponse.json({ error: `Acao desconhecida: ${action}` }, { status: 400 })
     }
@@ -925,4 +927,87 @@ async function recalcularTotal(comandaId: string) {
 
   const total = itens?.reduce((sum, i) => sum + i.subtotal, 0) || 0
   await supabaseAdmin.from('comandas').update({ total }).eq('id', comandaId)
+}
+
+// ============================================
+// EXCLUIR PAGAMENTO FIADO
+// ============================================
+
+async function handleExcluirPagamentoFiado(params: {
+  pagamentoId: string
+  comandaId: string
+}, empresaId: number) {
+  const { pagamentoId, comandaId } = params
+
+  // Verificar se o pagamento existe e pertence a empresa
+  const { data: pagamento, error: fetchErr } = await supabaseAdmin
+    .from('fiado_pagamentos')
+    .select('*')
+    .eq('id', pagamentoId)
+    .eq('empresa_id', empresaId)
+    .single()
+
+  if (fetchErr || !pagamento) {
+    return NextResponse.json({ error: 'Pagamento nao encontrado' }, { status: 404 })
+  }
+
+  // Excluir o pagamento
+  await supabaseAdmin
+    .from('fiado_pagamentos')
+    .delete()
+    .eq('id', pagamentoId)
+    .eq('empresa_id', empresaId)
+
+  // Recalcular se a comanda ainda esta quitada
+  const { data: pagamentosRestantes } = await supabaseAdmin
+    .from('fiado_pagamentos')
+    .select('valor')
+    .eq('comanda_id', comandaId)
+    .eq('empresa_id', empresaId)
+
+  const totalPago = (pagamentosRestantes || []).reduce((acc, p) => acc + Number(p.valor), 0)
+
+  // Buscar comanda
+  const { data: comanda } = await supabaseAdmin
+    .from('comandas')
+    .select('total, fiado_pago')
+    .eq('id', comandaId)
+    .eq('empresa_id', empresaId)
+    .single()
+
+  if (comanda) {
+    const aindaQuitado = totalPago >= comanda.total - 0.01
+
+    if (comanda.fiado_pago && !aindaQuitado) {
+      // Reabrir a divida
+      await supabaseAdmin
+        .from('comandas')
+        .update({ fiado_pago: false, fiado_pago_em: null })
+        .eq('id', comandaId)
+        .eq('empresa_id', empresaId)
+    }
+  }
+
+  // Remover entrada correspondente do caixa (valor e descricao parcial)
+  // Busca a entrada mais recente com valor igual
+  const { data: caixaEntrada } = await supabaseAdmin
+    .from('caixa')
+    .select('id')
+    .eq('empresa_id', empresaId)
+    .eq('tipo', 'entrada')
+    .eq('valor', pagamento.valor)
+    .ilike('descricao', `%Comanda #%`)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (caixaEntrada) {
+    await supabaseAdmin
+      .from('caixa')
+      .delete()
+      .eq('id', caixaEntrada.id)
+      .eq('empresa_id', empresaId)
+  }
+
+  return NextResponse.json({ result: { success: true, valorExcluido: pagamento.valor } })
 }

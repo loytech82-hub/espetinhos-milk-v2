@@ -2,16 +2,27 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, AlertCircle, Phone, ChevronDown, ChevronUp, Plus, Banknote, ArrowLeft, ShoppingBag, Calendar, CircleDollarSign } from 'lucide-react'
+import { Search, AlertCircle, Phone, ChevronDown, ChevronUp, Plus, Banknote, ArrowLeft, ShoppingBag, Calendar, CircleDollarSign, Trash2, QrCode, CreditCard } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
+import { excluirPagamentoFiado } from '@/lib/supabase-helpers'
 import { EmptyState } from '@/components/ui/empty-state'
 import { AccessDenied } from '@/components/ui/access-denied'
 import { SkeletonCard, SkeletonTable } from '@/components/ui/skeleton'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useAuth } from '@/lib/auth-context'
+import { useToast } from '@/lib/toast-context'
 import { ReceberPagamentoModal } from '@/components/devedores/receber-pagamento-modal'
 import { AddProdutoFiadoModal } from '@/components/devedores/add-produto-fiado-modal'
 import type { Comanda, ComandaItem } from '@/lib/types'
+
+interface PagamentoFiado {
+  id: string
+  comanda_id: string
+  valor: number
+  forma_pagamento: string
+  created_at: string
+}
 
 interface ClienteDevedor {
   id: string
@@ -21,13 +32,34 @@ interface ClienteDevedor {
   comandas: (Comanda & { itens?: ComandaItem[] })[]
 }
 
+const formaLabels: Record<string, string> = {
+  dinheiro: 'Dinheiro',
+  pix: 'PIX',
+  cartao_debito: 'Debito',
+  cartao_credito: 'Credito',
+}
+
+const formaIcons: Record<string, typeof Banknote> = {
+  dinheiro: Banknote,
+  pix: QrCode,
+  cartao_debito: CreditCard,
+  cartao_credito: CreditCard,
+}
+
 export default function DevedoresPage() {
   const router = useRouter()
   const { role } = useAuth()
+  const { toast } = useToast()
   const [devedores, setDevedores] = useState<ClienteDevedor[]>([])
+  const [pagamentos, setPagamentos] = useState<PagamentoFiado[]>([])
   const [busca, setBusca] = useState('')
   const [loading, setLoading] = useState(true)
   const [expandido, setExpandido] = useState<string | null>(null)
+
+  // Excluir pagamento
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [pgtoToDelete, setPgtoToDelete] = useState<PagamentoFiado | null>(null)
 
   // Modais
   const [pgtoModal, setPgtoModal] = useState<{ open: boolean; comanda: Comanda | null; clienteId: string; clienteNome: string }>({
@@ -53,7 +85,8 @@ export default function DevedoresPage() {
           .order('fechada_em', { ascending: false }),
         supabase
           .from('fiado_pagamentos')
-          .select('comanda_id, valor'),
+          .select('id, comanda_id, valor, forma_pagamento, created_at')
+          .order('created_at', { ascending: false }),
       ])
 
       if (!comandasData) {
@@ -61,6 +94,9 @@ export default function DevedoresPage() {
         setLoading(false)
         return
       }
+
+      // Guardar pagamentos para mostrar historico
+      setPagamentos((pagamentosData || []) as PagamentoFiado[])
 
       const pagoPorComanda = new Map<string, number>()
       ;(pagamentosData || []).forEach(p => {
@@ -110,6 +146,23 @@ export default function DevedoresPage() {
     }
   }
 
+  async function handleDeletePagamento() {
+    if (!pgtoToDelete) return
+
+    setDeleteLoading(true)
+    try {
+      await excluirPagamentoFiado(pgtoToDelete.id, pgtoToDelete.comanda_id)
+      toast(`Lancamento de ${formatCurrency(pgtoToDelete.valor)} excluido!`, 'success')
+      setDeleteOpen(false)
+      setPgtoToDelete(null)
+      loadDevedores()
+    } catch (err: unknown) {
+      toast((err as Error).message, 'error')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
   const filtered = useMemo(() => {
     if (!busca.trim()) return devedores
     const s = busca.toLowerCase()
@@ -123,6 +176,11 @@ export default function DevedoresPage() {
 
   function toggleExpand(id: string) {
     setExpandido(prev => prev === id ? null : id)
+  }
+
+  // Pagamentos de uma comanda especifica
+  function getPagamentosComanda(comandaId: string) {
+    return pagamentos.filter(p => p.comanda_id === comandaId)
   }
 
   if (role === 'garcom') return <AccessDenied />
@@ -272,6 +330,7 @@ export default function DevedoresPage() {
                         const valorPago = ((comanda as unknown as Record<string, unknown>)._valor_pago as number) || 0
                         const saldo = comanda.total - valorPago
                         const percentPago = comanda.total > 0 ? (valorPago / comanda.total) * 100 : 0
+                        const pgtos = getPagamentosComanda(comanda.id)
 
                         return (
                           <div key={comanda.id} className="bg-bg-elevated rounded-xl overflow-hidden">
@@ -323,7 +382,54 @@ export default function DevedoresPage() {
                               </div>
                             </div>
 
-                            {/* Itens da comanda - visual melhorado */}
+                            {/* Historico de pagamentos (lancamentos) */}
+                            {pgtos.length > 0 && (
+                              <div className="border-t border-bg-card">
+                                <div className="px-4 py-2">
+                                  <span className="text-[11px] text-text-muted uppercase tracking-wider font-semibold">
+                                    Lancamentos ({pgtos.length})
+                                  </span>
+                                </div>
+                                <div className="px-4 pb-3 space-y-1.5">
+                                  {pgtos.map(pgto => {
+                                    const FormaIcon = formaIcons[pgto.forma_pagamento] || Banknote
+                                    return (
+                                      <div key={pgto.id} className="flex items-center justify-between py-2 px-3 bg-bg-card/50 rounded-lg group">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                          <FormaIcon className="w-4 h-4 text-success shrink-0" />
+                                          <div className="min-w-0">
+                                            <span className="text-sm text-success font-bold">
+                                              +{formatCurrency(pgto.valor)}
+                                            </span>
+                                            <span className="text-xs text-text-muted ml-2">
+                                              {formaLabels[pgto.forma_pagamento] || pgto.forma_pagamento}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                          <span className="text-[11px] text-text-muted">
+                                            {new Date(pgto.created_at).toLocaleDateString('pt-BR')} {new Date(pgto.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setPgtoToDelete(pgto)
+                                              setDeleteOpen(true)
+                                            }}
+                                            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-danger hover:bg-danger/10 transition-colors cursor-pointer opacity-60 hover:opacity-100"
+                                            title="Excluir lancamento"
+                                          >
+                                            <Trash2 className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Itens da comanda */}
                             {comanda.itens && comanda.itens.length > 0 && (
                               <div className="border-t border-bg-card">
                                 <div className="px-4 py-2">
@@ -386,6 +492,18 @@ export default function DevedoresPage() {
           description="Todos os pagamentos estao em dia!"
         />
       )}
+
+      {/* Dialog: Excluir Lancamento */}
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Excluir Lancamento"
+        description={pgtoToDelete ? `Tem certeza que deseja excluir o lancamento de ${formatCurrency(pgtoToDelete.valor)} (${formaLabels[pgtoToDelete.forma_pagamento] || pgtoToDelete.forma_pagamento})? O valor sera removido dos pagamentos e o saldo devedor sera atualizado.` : ''}
+        onConfirm={handleDeletePagamento}
+        loading={deleteLoading}
+        confirmText="Sim, Excluir"
+        variant="danger"
+      />
 
       {/* Modais */}
       <ReceberPagamentoModal
