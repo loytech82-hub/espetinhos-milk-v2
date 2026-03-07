@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { useToast } from '@/lib/toast-context'
 import { formatCurrency } from '@/lib/utils'
 import { receberFiadoParcial } from '@/lib/supabase-helpers'
-import { Banknote, QrCode, CreditCard } from 'lucide-react'
+import { Banknote, QrCode, CreditCard, CircleDollarSign, CheckCircle2 } from 'lucide-react'
 import type { Comanda } from '@/lib/types'
 
 interface ReceberPagamentoModalProps {
@@ -20,10 +20,10 @@ interface ReceberPagamentoModalProps {
 }
 
 const formasRecebimento = [
-  { value: 'dinheiro', label: 'Dinheiro', icon: Banknote },
-  { value: 'pix', label: 'PIX', icon: QrCode },
-  { value: 'cartao_debito', label: 'Debito', icon: CreditCard },
-  { value: 'cartao_credito', label: 'Credito', icon: CreditCard },
+  { value: 'dinheiro', label: 'Dinheiro', icon: Banknote, cor: 'text-success' },
+  { value: 'pix', label: 'PIX', icon: QrCode, cor: 'text-[#00BDAE]' },
+  { value: 'cartao_debito', label: 'Debito', icon: CreditCard, cor: 'text-blue-400' },
+  { value: 'cartao_credito', label: 'Credito', icon: CreditCard, cor: 'text-purple-400' },
 ]
 
 export function ReceberPagamentoModal({ open, onOpenChange, comanda, clienteId, clienteNome, onRecebido }: ReceberPagamentoModalProps) {
@@ -36,7 +36,6 @@ export function ReceberPagamentoModal({ open, onOpenChange, comanda, clienteId, 
   useEffect(() => {
     if (open && comanda) {
       setForma('pix')
-      // Calcular saldo devedor a partir de fiado_pagamentos
       supabase
         .from('fiado_pagamentos')
         .select('valor')
@@ -76,6 +75,10 @@ export function ReceberPagamentoModal({ open, onOpenChange, comanda, clienteId, 
     }
   }
 
+  const valorNum = parseFloat(valor) || 0
+  const isParcial = valorNum > 0 && valorNum < saldoDevedor - 0.01
+  const isTotal = valorNum >= saldoDevedor - 0.01
+
   return (
     <Modal
       open={open}
@@ -84,73 +87,134 @@ export function ReceberPagamentoModal({ open, onOpenChange, comanda, clienteId, 
       description={clienteNome ? `Cliente: ${clienteNome}` : undefined}
     >
       <div className="space-y-5">
-        {/* Info da comanda */}
+        {/* Resumo visual da divida */}
         {comanda && (
-          <div className="p-4 bg-bg-elevated rounded-xl">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-xs text-text-muted">Comanda #{comanda.numero}</span>
-              <span className="text-xs text-text-muted">Total: {formatCurrency(comanda.total)}</span>
+          <div className="rounded-xl overflow-hidden">
+            <div className="bg-danger/10 px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CircleDollarSign className="w-5 h-5 text-danger" />
+                <span className="text-sm font-bold text-text-white">
+                  Comanda #{comanda.numero}
+                </span>
+              </div>
+              <span className="text-xs text-text-muted">
+                Total: {formatCurrency(comanda.total)}
+              </span>
             </div>
+
+            {/* Barra de progresso */}
             {comanda.total - saldoDevedor > 0.01 && (
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-xs text-success">Ja pago</span>
-                <span className="text-xs text-success">{formatCurrency(comanda.total - saldoDevedor)}</span>
+              <div className="bg-bg-elevated px-4 py-3 space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-success font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Ja pago: {formatCurrency(comanda.total - saldoDevedor)}
+                  </span>
+                  <span className="text-text-muted">
+                    {((comanda.total - saldoDevedor) / comanda.total * 100).toFixed(0)}%
+                  </span>
+                </div>
+                <div className="h-2 bg-bg-card rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-success rounded-full"
+                    style={{ width: `${((comanda.total - saldoDevedor) / comanda.total) * 100}%` }}
+                  />
+                </div>
               </div>
             )}
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-semibold text-text-white">Saldo devedor</span>
-              <span className="font-heading text-xl font-bold text-danger">{formatCurrency(saldoDevedor)}</span>
+
+            <div className="bg-bg-elevated px-4 py-3 flex items-center justify-between border-t border-bg-card">
+              <span className="text-sm font-bold text-text-white">Saldo devedor</span>
+              <span className="font-heading text-2xl font-bold text-danger">{formatCurrency(saldoDevedor)}</span>
             </div>
           </div>
         )}
 
-        {/* Valor */}
-        <div className="space-y-2">
-          <label className="block text-xs text-text-muted">Valor do pagamento</label>
-          <input
-            type="number"
-            step="0.01"
-            min="0.01"
-            max={saldoDevedor}
-            value={valor}
-            onChange={(e) => setValor(e.target.value)}
-            className="w-full h-12 px-4 bg-bg-elevated border border-bg-placeholder rounded-xl text-center font-heading text-2xl font-bold text-orange outline-none focus:ring-2 focus:ring-orange/50"
-          />
-          <div className="flex gap-2">
+        {/* Valor do pagamento */}
+        <div className="space-y-3">
+          <label className="block text-xs text-text-muted uppercase tracking-wider font-semibold">
+            Valor do pagamento
+          </label>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted text-lg">R$</span>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              max={saldoDevedor}
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              className="w-full h-14 pl-12 pr-4 bg-bg-elevated border-2 border-bg-placeholder rounded-xl text-left font-heading text-2xl font-bold text-orange outline-none focus:border-orange transition-colors"
+            />
+          </div>
+
+          {/* Indicador parcial/total */}
+          {valorNum > 0 && (
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold ${
+              isTotal ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'
+            }`}>
+              {isTotal ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  Pagamento total — quita a divida
+                </>
+              ) : isParcial ? (
+                <>
+                  <CircleDollarSign className="w-4 h-4" />
+                  Pagamento parcial — restara {formatCurrency(saldoDevedor - valorNum)}
+                </>
+              ) : null}
+            </div>
+          )}
+
+          {/* Botoes de valor rapido */}
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
               onClick={() => setValor(saldoDevedor.toFixed(2))}
-              className="flex-1 h-8 bg-bg-elevated rounded-lg text-xs text-text-muted hover:text-text-white transition-colors cursor-pointer"
+              className={`h-10 rounded-xl font-heading text-sm font-bold transition-colors cursor-pointer ${
+                isTotal ? 'bg-success/20 text-success' : 'bg-bg-elevated text-text-muted hover:text-text-white'
+              }`}
             >
-              Valor total
+              Total
             </button>
             <button
               type="button"
               onClick={() => setValor((saldoDevedor / 2).toFixed(2))}
-              className="flex-1 h-8 bg-bg-elevated rounded-lg text-xs text-text-muted hover:text-text-white transition-colors cursor-pointer"
+              className="h-10 bg-bg-elevated rounded-xl font-heading text-sm font-bold text-text-muted hover:text-text-white transition-colors cursor-pointer"
             >
               Metade
+            </button>
+            <button
+              type="button"
+              onClick={() => setValor((saldoDevedor / 3).toFixed(2))}
+              className="h-10 bg-bg-elevated rounded-xl font-heading text-sm font-bold text-text-muted hover:text-text-white transition-colors cursor-pointer"
+            >
+              1/3
             </button>
           </div>
         </div>
 
         {/* Forma de pagamento */}
         <div>
-          <label className="block text-xs text-text-muted mb-2">Forma de pagamento</label>
-          <div className="grid grid-cols-2 gap-3">
+          <label className="block text-xs text-text-muted uppercase tracking-wider font-semibold mb-2">
+            Forma de pagamento
+          </label>
+          <div className="grid grid-cols-2 gap-2">
             {formasRecebimento.map(fp => (
               <button
                 key={fp.value}
                 type="button"
                 onClick={() => setForma(fp.value)}
-                className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all cursor-pointer ${
+                className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
                   forma === fp.value
-                    ? 'border-orange bg-orange-soft'
+                    ? 'border-orange bg-orange/10'
                     : 'border-bg-placeholder bg-bg-elevated hover:border-bg-placeholder/80'
                 }`}
               >
-                <fp.icon size={18} className={forma === fp.value ? 'text-orange' : 'text-text-muted'} />
-                <span className="font-heading text-sm font-semibold">{fp.label}</span>
+                <fp.icon size={20} className={forma === fp.value ? 'text-orange' : fp.cor} />
+                <span className={`font-heading text-sm font-bold ${forma === fp.value ? 'text-orange' : 'text-text-white'}`}>
+                  {fp.label}
+                </span>
               </button>
             ))}
           </div>

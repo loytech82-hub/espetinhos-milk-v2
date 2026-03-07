@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { Search, AlertCircle, Phone, ChevronDown, ChevronUp, Plus, Banknote } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Search, AlertCircle, Phone, ChevronDown, ChevronUp, Plus, Banknote, ArrowLeft, ShoppingBag, Calendar, CircleDollarSign } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -19,6 +20,7 @@ interface ClienteDevedor {
 }
 
 export default function DevedoresPage() {
+  const router = useRouter()
   const [devedores, setDevedores] = useState<ClienteDevedor[]>([])
   const [busca, setBusca] = useState('')
   const [loading, setLoading] = useState(true)
@@ -38,7 +40,6 @@ export default function DevedoresPage() {
 
   async function loadDevedores() {
     try {
-      // Buscar todas as comandas fiado nao pagas com itens
       const [{ data: comandasData }, { data: pagamentosData }] = await Promise.all([
         supabase
           .from('comandas')
@@ -58,13 +59,11 @@ export default function DevedoresPage() {
         return
       }
 
-      // Calcular total pago por comanda
       const pagoPorComanda = new Map<string, number>()
       ;(pagamentosData || []).forEach(p => {
         pagoPorComanda.set(p.comanda_id, (pagoPorComanda.get(p.comanda_id) || 0) + Number(p.valor))
       })
 
-      // Buscar clientes
       const clienteIds = [...new Set(comandasData.map(c => c.cliente_id).filter(Boolean))]
       const { data: clientesData } = await supabase
         .from('clientes')
@@ -73,7 +72,6 @@ export default function DevedoresPage() {
 
       const clientesMap = new Map((clientesData || []).map(c => [c.id, c]))
 
-      // Agrupar por cliente
       const devedoresMap = new Map<string, ClienteDevedor>()
       for (const comanda of comandasData) {
         const clienteId = comanda.cliente_id!
@@ -84,7 +82,6 @@ export default function DevedoresPage() {
         const saldoDevedor = comanda.total - valorPago
         if (saldoDevedor <= 0.01) continue
 
-        // Anotar valor pago na comanda para uso no UI
         ;(comanda as unknown as Record<string, unknown>)._valor_pago = valorPago
 
         if (!devedoresMap.has(clienteId)) {
@@ -101,7 +98,6 @@ export default function DevedoresPage() {
         dev.comandas.push(comanda)
       }
 
-      // Ordenar por divida (maior primeiro)
       const lista = Array.from(devedoresMap.values()).sort((a, b) => b.total_divida - a.total_divida)
       setDevedores(lista)
     } catch (err) {
@@ -127,41 +123,52 @@ export default function DevedoresPage() {
   }
 
   return (
-    <div className="p-6 lg:p-10 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl lg:text-4xl font-bold">DEVEDORES</h1>
-          <p className="text-sm text-text-muted">Clientes com pagamentos pendentes</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 h-10 px-4 bg-bg-elevated rounded-2xl">
-            <Search className="w-3.5 h-3.5 text-text-muted" />
+    <div className="p-4 sm:p-6 lg:p-10 space-y-5">
+      {/* Header com botao voltar */}
+      <div className="flex flex-col gap-4">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="flex items-center gap-2 text-text-muted hover:text-text-white transition-colors cursor-pointer w-fit"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span className="text-sm font-medium">Voltar</span>
+        </button>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="font-heading text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">
+              Devedores
+            </h1>
+            <p className="text-sm text-text-muted mt-0.5">Clientes com pagamentos pendentes</p>
+          </div>
+          <div className="flex items-center gap-2 h-10 px-4 bg-bg-elevated rounded-2xl w-full sm:w-auto">
+            <Search className="w-4 h-4 text-text-muted shrink-0" />
             <input
               type="text"
-              placeholder="buscar cliente..."
+              placeholder="Buscar cliente..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              className="bg-transparent text-xs text-text-white placeholder:text-text-muted outline-none w-40"
+              className="bg-transparent text-sm text-text-white placeholder:text-text-muted outline-none w-full sm:w-48"
             />
           </div>
         </div>
       </div>
 
-      {/* Card Total */}
+      {/* Cards resumo */}
       {devedores.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="p-5 bg-bg-card rounded-2xl border-l-4 border-danger">
-            <span className="text-xs text-text-muted">Total a Receber</span>
-            <p className="font-heading text-3xl font-bold text-danger mt-1">{formatCurrency(totalGeral)}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="p-4 sm:p-5 bg-bg-card rounded-2xl border-l-4 border-danger">
+            <span className="text-xs text-text-muted uppercase tracking-wider">Total a Receber</span>
+            <p className="font-heading text-2xl sm:text-3xl font-bold text-danger mt-1">{formatCurrency(totalGeral)}</p>
           </div>
-          <div className="p-5 bg-bg-card rounded-2xl">
-            <span className="text-xs text-text-muted">Clientes Devedores</span>
-            <p className="font-heading text-3xl font-bold text-text-white mt-1">{devedores.length}</p>
+          <div className="p-4 sm:p-5 bg-bg-card rounded-2xl">
+            <span className="text-xs text-text-muted uppercase tracking-wider">Clientes Devedores</span>
+            <p className="font-heading text-2xl sm:text-3xl font-bold text-text-white mt-1">{devedores.length}</p>
           </div>
-          <div className="p-5 bg-bg-card rounded-2xl">
-            <span className="text-xs text-text-muted">Comandas Pendentes</span>
-            <p className="font-heading text-3xl font-bold text-text-white mt-1">
+          <div className="p-4 sm:p-5 bg-bg-card rounded-2xl">
+            <span className="text-xs text-text-muted uppercase tracking-wider">Comandas Pendentes</span>
+            <p className="font-heading text-2xl sm:text-3xl font-bold text-text-white mt-1">
               {devedores.reduce((acc, d) => acc + d.comandas.length, 0)}
             </p>
           </div>
@@ -171,7 +178,7 @@ export default function DevedoresPage() {
       {/* Lista de devedores */}
       {loading ? (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <SkeletonCard /><SkeletonCard /><SkeletonCard />
           </div>
           <SkeletonTable rows={4} />
@@ -186,97 +193,177 @@ export default function DevedoresPage() {
                 <button
                   type="button"
                   onClick={() => toggleExpand(devedor.id)}
-                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-bg-elevated transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-between px-4 sm:px-5 py-4 hover:bg-bg-elevated transition-colors cursor-pointer"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-danger/20 rounded-xl flex items-center justify-center">
-                      <AlertCircle className="w-5 h-5 text-danger" />
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                    {/* Avatar com inicial */}
+                    <div className="w-11 h-11 bg-danger/15 rounded-full flex items-center justify-center shrink-0">
+                      <span className="font-heading text-lg font-bold text-danger">
+                        {devedor.nome.charAt(0).toUpperCase()}
+                      </span>
                     </div>
-                    <div className="text-left">
-                      <p className="text-[15px] text-text-white font-semibold">{devedor.nome}</p>
-                      {devedor.telefone && (
-                        <p className="text-xs text-text-muted flex items-center gap-1">
-                          <Phone className="w-3 h-3" /> {devedor.telefone}
-                        </p>
-                      )}
+                    <div className="text-left min-w-0">
+                      <p className="text-base sm:text-lg text-text-white font-bold truncate">
+                        {devedor.nome}
+                      </p>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        {devedor.telefone && (
+                          <span className="text-xs text-text-muted flex items-center gap-1">
+                            <Phone className="w-3 h-3" /> {devedor.telefone}
+                          </span>
+                        )}
+                        <span className="text-xs text-text-muted">
+                          {devedor.comandas.length} comanda{devedor.comandas.length > 1 ? 's' : ''}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3 shrink-0">
                     <div className="text-right">
-                      <p className="font-heading text-xl font-bold text-danger">{formatCurrency(devedor.total_divida)}</p>
-                      <p className="text-[11px] text-text-muted">{devedor.comandas.length} comanda{devedor.comandas.length > 1 ? 's' : ''}</p>
+                      <p className="font-heading text-lg sm:text-xl font-bold text-danger">
+                        {formatCurrency(devedor.total_divida)}
+                      </p>
                     </div>
-                    {isExpanded ? <ChevronUp className="w-5 h-5 text-text-muted" /> : <ChevronDown className="w-5 h-5 text-text-muted" />}
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${isExpanded ? 'bg-orange/20' : 'bg-bg-elevated'}`}>
+                      {isExpanded
+                        ? <ChevronUp className="w-4 h-4 text-orange" />
+                        : <ChevronDown className="w-4 h-4 text-text-muted" />
+                      }
+                    </div>
                   </div>
                 </button>
 
                 {/* Detalhes expandidos */}
                 {isExpanded && (
-                  <div className="px-5 pb-5 space-y-4">
+                  <div className="px-4 sm:px-5 pb-5 space-y-4 border-t border-bg-elevated">
                     {/* Acoes rapidas */}
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap gap-2 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => setPgtoModal({
+                          open: true,
+                          comanda: devedor.comandas[0],
+                          clienteId: devedor.id,
+                          clienteNome: devedor.nome,
+                        })}
+                        className="flex items-center gap-2 h-10 px-5 bg-success text-text-dark font-heading text-sm font-bold rounded-xl hover:opacity-90 transition-colors cursor-pointer"
+                      >
+                        <CircleDollarSign className="w-4 h-4" />
+                        Receber Pagamento
+                      </button>
                       <button
                         type="button"
                         onClick={() => setAddProdModal({ open: true, clienteId: devedor.id, clienteNome: devedor.nome })}
-                        className="flex items-center gap-2 h-9 px-4 bg-orange text-text-dark font-heading text-xs font-semibold rounded-xl hover:bg-orange-hover transition-colors cursor-pointer"
+                        className="flex items-center gap-2 h-10 px-5 bg-orange text-text-dark font-heading text-sm font-bold rounded-xl hover:bg-orange-hover transition-colors cursor-pointer"
                       >
-                        <Plus className="w-3.5 h-3.5" />
+                        <Plus className="w-4 h-4" />
                         Adicionar Produtos
                       </button>
                     </div>
 
                     {/* Lista de comandas */}
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {devedor.comandas.map(comanda => {
                         const valorPago = ((comanda as unknown as Record<string, unknown>)._valor_pago as number) || 0
                         const saldo = comanda.total - valorPago
+                        const percentPago = comanda.total > 0 ? (valorPago / comanda.total) * 100 : 0
+
                         return (
-                          <div key={comanda.id} className="p-4 bg-bg-elevated rounded-xl space-y-3">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <span className="font-heading text-sm font-semibold text-text-white">
-                                  Comanda #{comanda.numero}
-                                </span>
-                                <span className="text-xs text-text-muted ml-2">
-                                  {comanda.fechada_em ? new Date(comanda.fechada_em).toLocaleDateString('pt-BR') : ''}
-                                </span>
-                              </div>
-                              <div className="text-right">
-                                <p className="font-heading text-sm font-bold text-danger">{formatCurrency(saldo)}</p>
-                                {valorPago > 0 && (
-                                  <p className="text-[11px] text-success">
-                                    Pago: {formatCurrency(valorPago)} de {formatCurrency(comanda.total)}
-                                  </p>
+                          <div key={comanda.id} className="bg-bg-elevated rounded-xl overflow-hidden">
+                            {/* Header da comanda */}
+                            <div className="px-4 py-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <ShoppingBag className="w-4 h-4 text-orange" />
+                                  <span className="font-heading text-base font-bold text-text-white">
+                                    Comanda #{comanda.numero}
+                                  </span>
+                                </div>
+                                {comanda.fechada_em && (
+                                  <span className="flex items-center gap-1.5 text-xs text-text-muted bg-bg-card px-2.5 py-1 rounded-lg">
+                                    <Calendar className="w-3 h-3" />
+                                    {new Date(comanda.fechada_em).toLocaleDateString('pt-BR')}
+                                  </span>
                                 )}
+                              </div>
+
+                              {/* Barra de progresso do pagamento */}
+                              <div className="space-y-1.5">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-text-muted">
+                                    Total: <span className="text-text-white font-semibold">{formatCurrency(comanda.total)}</span>
+                                  </span>
+                                  {valorPago > 0 ? (
+                                    <span className="text-success font-semibold">
+                                      Pago: {formatCurrency(valorPago)} ({percentPago.toFixed(0)}%)
+                                    </span>
+                                  ) : (
+                                    <span className="text-danger font-semibold">
+                                      Nenhum pagamento
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="h-2 bg-bg-card rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all ${valorPago > 0 ? 'bg-success' : 'bg-danger/30'}`}
+                                    style={{ width: `${Math.min(percentPago, 100)}%` }}
+                                  />
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-text-muted">Resta pagar:</span>
+                                  <span className="font-heading text-lg font-bold text-danger">
+                                    {formatCurrency(saldo)}
+                                  </span>
+                                </div>
                               </div>
                             </div>
 
-                            {/* Itens da comanda */}
+                            {/* Itens da comanda - visual melhorado */}
                             {comanda.itens && comanda.itens.length > 0 && (
-                              <div className="space-y-1">
-                                {comanda.itens.map((item: ComandaItem) => (
-                                  <div key={item.id} className="flex justify-between text-xs text-text-muted">
-                                    <span>{item.quantidade}x {(item.produto as { nome: string } | undefined)?.nome || 'Produto'}</span>
-                                    <span>{formatCurrency(item.subtotal)}</span>
-                                  </div>
-                                ))}
+                              <div className="border-t border-bg-card">
+                                <div className="px-4 py-2">
+                                  <span className="text-[11px] text-text-muted uppercase tracking-wider font-semibold">
+                                    Itens do pedido
+                                  </span>
+                                </div>
+                                <div className="px-4 pb-3 space-y-1.5">
+                                  {comanda.itens.map((item: ComandaItem) => (
+                                    <div key={item.id} className="flex items-center justify-between py-1.5 px-3 bg-bg-card/50 rounded-lg">
+                                      <div className="flex items-center gap-2.5">
+                                        <span className="w-6 h-6 bg-orange/15 text-orange rounded-md flex items-center justify-center text-xs font-bold shrink-0">
+                                          {item.quantidade}x
+                                        </span>
+                                        <span className="text-sm text-text-white font-medium">
+                                          {(item.produto as { nome: string } | undefined)?.nome || 'Produto'}
+                                        </span>
+                                      </div>
+                                      <span className="text-sm font-heading font-bold text-text-white">
+                                        {formatCurrency(item.subtotal)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             )}
 
-                            {/* Botao receber */}
-                            <button
-                              type="button"
-                              onClick={() => setPgtoModal({
-                                open: true,
-                                comanda,
-                                clienteId: devedor.id,
-                                clienteNome: devedor.nome,
-                              })}
-                              className="flex items-center gap-2 h-8 px-3 bg-success/20 text-success font-heading text-xs font-semibold rounded-lg hover:bg-success/30 transition-colors cursor-pointer"
-                            >
-                              <Banknote className="w-3.5 h-3.5" />
-                              Receber Pagamento
-                            </button>
+                            {/* Botao receber individual */}
+                            {devedor.comandas.length > 1 && (
+                              <div className="px-4 pb-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setPgtoModal({
+                                    open: true,
+                                    comanda,
+                                    clienteId: devedor.id,
+                                    clienteNome: devedor.nome,
+                                  })}
+                                  className="flex items-center justify-center gap-2 w-full h-9 bg-success/15 text-success font-heading text-sm font-bold rounded-lg hover:bg-success/25 transition-colors cursor-pointer"
+                                >
+                                  <Banknote className="w-4 h-4" />
+                                  Pagar esta comanda
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )
                       })}
