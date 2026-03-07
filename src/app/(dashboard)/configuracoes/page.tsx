@@ -64,6 +64,11 @@ export default function ConfiguracoesPage() {
   const [newRole, setNewRole] = useState<UserRole>('garcom')
   const [roleSaving, setRoleSaving] = useState(false)
 
+  // Modal de novo garcom
+  const [garcomModalOpen, setGarcomModalOpen] = useState(false)
+  const [garcomNome, setGarcomNome] = useState('')
+  const [garcomSaving, setGarcomSaving] = useState(false)
+
   useEffect(() => {
     loadData()
   }, [])
@@ -217,6 +222,36 @@ export default function ConfiguracoesPage() {
       toast((err as Error).message, 'error')
     } finally {
       setPerfilSavingSenha(false)
+    }
+  }
+
+  // Cadastrar novo garcom via API
+  async function handleCadastrarGarcom(e: React.FormEvent) {
+    e.preventDefault()
+    if (!garcomNome.trim()) { toast('Informe o nome do garcom', 'error'); return }
+
+    setGarcomSaving(true)
+    try {
+      const res = await fetch('/api/auth/garcons/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome: garcomNome.trim() }),
+      })
+      const data = await res.json()
+
+      if (!res.ok || data.error) {
+        toast(data.error || 'Erro ao cadastrar garcom', 'error')
+        return
+      }
+
+      toast(`Garcom "${garcomNome.trim()}" cadastrado!`, 'success')
+      setGarcomModalOpen(false)
+      setGarcomNome('')
+      loadData()
+    } catch (err: unknown) {
+      toast((err as Error).message, 'error')
+    } finally {
+      setGarcomSaving(false)
     }
   }
 
@@ -460,7 +495,7 @@ export default function ConfiguracoesPage() {
           <div className="p-5 bg-bg-card rounded-2xl space-y-3 max-w-lg">
             <h3 className="font-heading text-sm font-semibold text-text-muted">ACESSO GARCONS</h3>
             <p className="text-xs text-text-muted">
-              Garcons podem acessar o sistema selecionando sua empresa na tela de login. Nao e necessario codigo de acesso.
+              Cadastre seus garcons na aba <strong className="text-text-white">Usuarios</strong>. Cada garcom acessa o sistema tocando no proprio nome na tela de login — sem senha.
             </p>
           </div>
         </form>
@@ -468,46 +503,102 @@ export default function ConfiguracoesPage() {
 
       {/* Tab: Usuarios */}
       {tab === 'usuarios' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-heading text-xl font-semibold">Usuarios ({usuarios.length})</h2>
-          </div>
-          <div className="rounded-2xl overflow-hidden space-y-px">
-            {usuarios.map(user => {
-              const RoleIcon = roleIcons[user.role] || Shield
-              return (
-                <div key={user.id} className="flex items-center justify-between gap-4 px-5 py-4 bg-bg-card">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-bg-elevated rounded-xl flex items-center justify-center">
-                      <span className="text-[11px] text-text-muted">
-                        {user.nome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                      </span>
+        <div className="space-y-6">
+          {/* Garcons */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-heading text-xl font-semibold">
+                Garcons ({usuarios.filter(u => u.role === 'garcom').length})
+              </h2>
+              <Button onClick={() => setGarcomModalOpen(true)} variant="primary" size="sm">
+                <Plus className="w-4 h-4" />
+                Novo Garcom
+              </Button>
+            </div>
+            <p className="text-xs text-text-muted">
+              Cada garcom cadastrado aqui aparece na tela de login. O garcom toca no proprio nome para entrar.
+            </p>
+            <div className="rounded-2xl overflow-hidden space-y-px">
+              {usuarios.filter(u => u.role === 'garcom').length === 0 ? (
+                <div className="px-5 py-8 bg-bg-card text-center">
+                  <p className="text-sm text-text-muted">Nenhum garcom cadastrado</p>
+                  <p className="text-xs text-text-muted mt-1">Clique em &quot;Novo Garcom&quot; para adicionar</p>
+                </div>
+              ) : (
+                usuarios.filter(u => u.role === 'garcom').map(usr => (
+                  <div key={usr.id} className="flex items-center justify-between gap-4 px-5 py-4 bg-bg-card">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-orange/15 rounded-full flex items-center justify-center">
+                        <span className="font-heading text-sm font-bold text-orange">
+                          {usr.nome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-sm text-text-white font-semibold">{usr.nome}</p>
+                        <p className="text-xs text-text-muted">
+                          {usr.ativo ? 'Ativo' : 'Inativo'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[13px] text-text-white font-medium">{user.nome}</p>
-                      <p className="text-xs text-text-muted">{user.email}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-bg-elevated text-xs text-text-muted">
-                      <RoleIcon className="w-3 h-3" />
-                      {roleLabels[user.role]}
-                    </span>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        setSelectedUser(user)
-                        setNewRole(user.role)
+                        setSelectedUser(usr)
+                        setNewRole(usr.role)
                         setRoleModalOpen(true)
                       }}
                     >
                       <Settings className="w-3.5 h-3.5" />
                     </Button>
                   </div>
-                </div>
-              )
-            })}
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Demais usuarios */}
+          <div className="space-y-3">
+            <h2 className="font-heading text-xl font-semibold">
+              Administradores e Caixa ({usuarios.filter(u => u.role !== 'garcom').length})
+            </h2>
+            <div className="rounded-2xl overflow-hidden space-y-px">
+              {usuarios.filter(u => u.role !== 'garcom').map(usr => {
+                const RoleIcon = roleIcons[usr.role] || Shield
+                return (
+                  <div key={usr.id} className="flex items-center justify-between gap-4 px-5 py-4 bg-bg-card">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-bg-elevated rounded-xl flex items-center justify-center">
+                        <span className="text-[11px] text-text-muted">
+                          {usr.nome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-[13px] text-text-white font-medium">{usr.nome}</p>
+                        <p className="text-xs text-text-muted">{usr.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-bg-elevated text-xs text-text-muted">
+                        <RoleIcon className="w-3 h-3" />
+                        {roleLabels[usr.role]}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedUser(usr)
+                          setNewRole(usr.role)
+                          setRoleModalOpen(true)
+                        }}
+                      >
+                        <Settings className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
       )}
@@ -551,6 +642,23 @@ export default function ConfiguracoesPage() {
           <div className="flex gap-3 justify-end">
             <Button type="button" variant="ghost" onClick={() => setCatModalOpen(false)}>Cancelar</Button>
             <Button type="submit" loading={catSaving}>Criar Categoria</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Novo Garcom */}
+      <Modal open={garcomModalOpen} onOpenChange={setGarcomModalOpen} title="Cadastrar Garcom" description="O garcom podera acessar o sistema tocando no proprio nome na tela de login.">
+        <form onSubmit={handleCadastrarGarcom} className="space-y-4">
+          <Input
+            label="Nome do Garcom"
+            value={garcomNome}
+            onChange={e => setGarcomNome(e.target.value)}
+            placeholder="Ex: Joao, Maria..."
+            autoFocus
+          />
+          <div className="flex gap-3 justify-end">
+            <Button type="button" variant="ghost" onClick={() => setGarcomModalOpen(false)}>Cancelar</Button>
+            <Button type="submit" loading={garcomSaving}>Cadastrar</Button>
           </div>
         </form>
       </Modal>
