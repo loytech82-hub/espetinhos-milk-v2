@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Settings, Users, Tag, Plus, Shield, ShieldCheck, ShieldAlert, Building2, Save, User, Mail, Lock, Pencil } from 'lucide-react'
+import { Settings, Users, Tag, Plus, Shield, ShieldCheck, ShieldAlert, Building2, Save, User, Mail, Lock, Pencil, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { updateEmpresa } from '@/lib/supabase-helpers'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import { useToast } from '@/lib/toast-context'
 import { useAuth } from '@/lib/auth-context'
 import { useEmpresa } from '@/lib/empresa-context'
 import { AccessDenied } from '@/components/ui/access-denied'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import type { Profile, Categoria, UserRole } from '@/lib/types'
 
 const roleLabels: Record<UserRole, string> = {
@@ -72,6 +73,11 @@ export default function ConfiguracoesPage() {
   const [garcomModalOpen, setGarcomModalOpen] = useState(false)
   const [garcomNome, setGarcomNome] = useState('')
   const [garcomSaving, setGarcomSaving] = useState(false)
+
+  // Excluir garcom
+  const [deleteGarcomOpen, setDeleteGarcomOpen] = useState(false)
+  const [garcomToDelete, setGarcomToDelete] = useState<Profile | null>(null)
+  const [deleteGarcomLoading, setDeleteGarcomLoading] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -256,6 +262,35 @@ export default function ConfiguracoesPage() {
       toast((err as Error).message, 'error')
     } finally {
       setGarcomSaving(false)
+    }
+  }
+
+  // Excluir garcom via API
+  async function handleDeleteGarcom() {
+    if (!garcomToDelete) return
+
+    setDeleteGarcomLoading(true)
+    try {
+      const res = await fetch('/api/auth/garcons/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ garcomId: garcomToDelete.id }),
+      })
+      const data = await res.json()
+
+      if (!res.ok || data.error) {
+        toast(data.error || 'Erro ao excluir garcom', 'error')
+        return
+      }
+
+      toast(`Garcom "${garcomToDelete.nome}" excluido!`, 'success')
+      setDeleteGarcomOpen(false)
+      setGarcomToDelete(null)
+      loadData()
+    } catch (err: unknown) {
+      toast((err as Error).message, 'error')
+    } finally {
+      setDeleteGarcomLoading(false)
     }
   }
 
@@ -541,22 +576,20 @@ export default function ConfiguracoesPage() {
                       </div>
                       <div>
                         <p className="text-sm text-text-white font-semibold">{usr.nome}</p>
-                        <p className="text-xs text-text-muted">
-                          {usr.ativo ? 'Ativo' : 'Inativo'}
-                        </p>
+                        <p className="text-xs text-text-muted">Ativo</p>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
+                    <button
+                      type="button"
                       onClick={() => {
-                        setSelectedUser(usr)
-                        setNewRole(usr.role)
-                        setRoleModalOpen(true)
+                        setGarcomToDelete(usr)
+                        setDeleteGarcomOpen(true)
                       }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-danger hover:bg-danger/10 transition-colors cursor-pointer"
                     >
-                      <Settings className="w-3.5 h-3.5" />
-                    </Button>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Excluir
+                    </button>
                   </div>
                 ))
               )}
@@ -668,6 +701,18 @@ export default function ConfiguracoesPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Dialog: Excluir Garcom */}
+      <ConfirmDialog
+        open={deleteGarcomOpen}
+        onOpenChange={setDeleteGarcomOpen}
+        title="Excluir Garcom"
+        description={garcomToDelete ? `Tem certeza que deseja excluir "${garcomToDelete.nome}"? O garcom nao podera mais acessar o sistema.` : ''}
+        onConfirm={handleDeleteGarcom}
+        loading={deleteGarcomLoading}
+        confirmText="Sim, Excluir"
+        variant="danger"
+      />
 
       {/* Modal: Alterar Role */}
       <Modal open={roleModalOpen} onOpenChange={setRoleModalOpen} title="Alterar Permissao" description={selectedUser ? `Alterar permissao de ${selectedUser.nome}` : ''}>

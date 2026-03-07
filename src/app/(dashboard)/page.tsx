@@ -181,21 +181,19 @@ export default function DashboardPage() {
             {formatCurrency(saldoCaixa)}
           </span>
         </div>
-        {fiadosPendentes > 0 && (
-          <div
-            onClick={() => router.push('/devedores')}
-            className="flex flex-col gap-3 p-5 bg-bg-card rounded-2xl border-l-4 border-warning cursor-pointer hover:bg-bg-elevated transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-warning" />
-              <span className="text-xs text-text-muted">A Prazo (pendente)</span>
-            </div>
-            <span className="font-heading text-3xl font-bold text-warning">
-              {formatCurrency(fiadosPendentes)}
-            </span>
-            <span className="text-[11px] text-orange">ver devedores →</span>
+        <div
+          onClick={() => router.push('/devedores')}
+          className={`flex flex-col gap-3 p-5 bg-bg-card rounded-2xl border-l-4 cursor-pointer hover:bg-bg-elevated transition-colors ${fiadosPendentes > 0 ? 'border-warning' : 'border-success'}`}
+        >
+          <div className="flex items-center gap-2">
+            <Clock className={`w-4 h-4 ${fiadosPendentes > 0 ? 'text-warning' : 'text-success'}`} />
+            <span className="text-xs text-text-muted">Vendas a Prazo</span>
           </div>
-        )}
+          <span className={`font-heading text-3xl font-bold ${fiadosPendentes > 0 ? 'text-warning' : 'text-success'}`}>
+            {formatCurrency(fiadosPendentes)}
+          </span>
+          <span className="text-[11px] text-orange">ver vendas a prazo →</span>
+        </div>
       </div>
 
       {/* Grafico de vendas + Estoque baixo */}

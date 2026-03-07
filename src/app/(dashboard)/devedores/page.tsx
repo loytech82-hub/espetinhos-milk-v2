@@ -143,7 +143,7 @@ export default function DevedoresPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="font-heading text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">
-              Devedores
+              Vendas a Prazo
             </h1>
             <p className="text-sm text-text-muted mt-0.5">Clientes com pagamentos pendentes</p>
           </div>
@@ -168,7 +168,7 @@ export default function DevedoresPage() {
             <p className="font-heading text-2xl sm:text-3xl font-bold text-danger mt-1">{formatCurrency(totalGeral)}</p>
           </div>
           <div className="p-4 sm:p-5 bg-bg-card rounded-2xl">
-            <span className="text-xs text-text-muted uppercase tracking-wider">Clientes Devedores</span>
+            <span className="text-xs text-text-muted uppercase tracking-wider">Clientes a Prazo</span>
             <p className="font-heading text-2xl sm:text-3xl font-bold text-text-white mt-1">{devedores.length}</p>
           </div>
           <div className="p-4 sm:p-5 bg-bg-card rounded-2xl">

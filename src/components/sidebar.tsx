@@ -34,7 +34,7 @@ const mainNav: NavItem[] = [
   { href: '/mesas', label: 'Mesas', icon: UtensilsCrossed },
   { href: '/clientes', label: 'Clientes', icon: Users },
   { href: '/caixa', label: 'Caixa', icon: DollarSign, roles: ['admin', 'caixa'] },
-  { href: '/devedores', label: 'Devedores', icon: AlertCircle, roles: ['admin', 'caixa'] },
+  { href: '/devedores', label: 'Vendas a Prazo', icon: AlertCircle, roles: ['admin', 'caixa'] },
 ]
 
 const moreNav: NavItem[] = [

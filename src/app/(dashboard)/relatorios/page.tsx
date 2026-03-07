@@ -435,7 +435,7 @@ export default function RelatoriosPage() {
                 <span className="font-heading text-2xl font-bold text-warning">
                   {formatCurrency(dados.atual.fiadosPendentes)}
                 </span>
-                <span className="text-[11px] text-orange">ver devedores →</span>
+                <span className="text-[11px] text-orange">ver vendas a prazo →</span>
               </Link>
             </div>
 

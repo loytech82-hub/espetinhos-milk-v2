@@ -37,7 +37,7 @@ const mainItems: NavItem[] = [
 ]
 
 const moreItems: NavItem[] = [
-  { href: '/devedores', label: 'Devedores', icon: AlertCircle, roles: ['admin', 'caixa'] },
+  { href: '/devedores', label: 'Vendas a Prazo', icon: AlertCircle, roles: ['admin', 'caixa'] },
   { href: '/produtos', label: 'Produtos', icon: Package, roles: ['admin'] },
   { href: '/relatorios', label: 'Relatorios', icon: BarChart3, roles: ['admin'] },
   { href: '/configuracoes', label: 'Configuracoes', icon: Settings, roles: ['admin'] },
