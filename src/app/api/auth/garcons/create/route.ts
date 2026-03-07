@@ -8,9 +8,9 @@ function getGarcomEmail(empresaId: number, garcomId: string): string {
   return `garcom-${empresaId}-${garcomId}@espetinhos.local`
 }
 
-function getGarcomPassword(empresaId: number, garcomId: string): string {
+function getPasswordFromEmail(email: string): string {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-  return createHash('sha256').update(`garcom-${url}-${empresaId}-${garcomId}`).digest('hex').slice(0, 20)
+  return createHash('sha256').update(`garcom-pwd-${url}-${email}`).digest('hex').slice(0, 20)
 }
 
 // Admin cadastra um novo garcom
@@ -36,10 +36,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Informe o nome do garcom' }, { status: 400 })
     }
 
-    // Criar um ID temporario para o garcom
-    const garcomId = randomUUID()
-    const email = getGarcomEmail(ctx.empresaId, garcomId)
-    const senha = getGarcomPassword(ctx.empresaId, garcomId)
+    // Criar email unico para o garcom
+    const garcomUniqueId = randomUUID()
+    const email = getGarcomEmail(ctx.empresaId, garcomUniqueId)
+    const senha = getPasswordFromEmail(email)
 
     // Criar auth user
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (newUser?.user) {
-      // Aguardar trigger
+      // Aguardar trigger criar profile
       for (let i = 0; i < 3; i++) {
         const { data } = await supabaseAdmin.from('profiles').select('id').eq('id', newUser.user.id).single()
         if (data) break
