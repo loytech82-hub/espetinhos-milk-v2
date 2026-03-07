@@ -5,6 +5,7 @@ import { Search, AlertCircle, Phone, ChevronDown, ChevronUp, Plus, Banknote } fr
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { EmptyState } from '@/components/ui/empty-state'
+import { SkeletonCard, SkeletonTable } from '@/components/ui/skeleton'
 import { ReceberPagamentoModal } from '@/components/devedores/receber-pagamento-modal'
 import { AddProdutoFiadoModal } from '@/components/devedores/add-produto-fiado-modal'
 import type { Comanda, ComandaItem } from '@/lib/types'
@@ -169,8 +170,11 @@ export default function DevedoresPage() {
 
       {/* Lista de devedores */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <span className="text-text-muted">carregando...</span>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <SkeletonCard /><SkeletonCard /><SkeletonCard />
+          </div>
+          <SkeletonTable rows={4} />
         </div>
       ) : filtered.length > 0 ? (
         <div className="space-y-3">

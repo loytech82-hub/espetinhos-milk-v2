@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Search, Users } from 'lucide-react'
+import { Plus, Search, Users, AlertCircle } from 'lucide-react'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { EmptyState } from '@/components/ui/empty-state'
+import { SkeletonTable } from '@/components/ui/skeleton'
 import { ClienteModal } from '@/components/clientes/cliente-modal'
 import type { Cliente } from '@/lib/types'
 
@@ -21,16 +23,27 @@ export default function ClientesPage() {
 
   async function loadClientes() {
     try {
-      const [{ data: clientesData }, { data: fiadosData }] = await Promise.all([
+      const [{ data: clientesData }, { data: fiadosData }, { data: pagamentosData }] = await Promise.all([
         supabase.from('clientes').select('*').order('nome'),
-        supabase.from('comandas').select('cliente_id, total').eq('fiado', true).eq('fiado_pago', false),
+        supabase.from('comandas').select('id, cliente_id, total').eq('fiado', true).eq('fiado_pago', false),
+        supabase.from('fiado_pagamentos').select('comanda_id, valor'),
       ])
 
-      // Agrupar fiados por cliente
+      // Total pago por comanda
+      const pagoPorComanda = new Map<string, number>()
+      ;(pagamentosData || []).forEach(p => {
+        pagoPorComanda.set(p.comanda_id, (pagoPorComanda.get(p.comanda_id) || 0) + Number(p.valor))
+      })
+
+      // Agrupar fiados por cliente (descontando pagamentos parciais)
       const fiadosPorCliente = new Map<string, number>()
       fiadosData?.forEach(f => {
         if (f.cliente_id) {
-          fiadosPorCliente.set(f.cliente_id, (fiadosPorCliente.get(f.cliente_id) || 0) + (f.total || 0))
+          const pago = pagoPorComanda.get(f.id) || 0
+          const saldo = (f.total || 0) - pago
+          if (saldo > 0.01) {
+            fiadosPorCliente.set(f.cliente_id, (fiadosPorCliente.get(f.cliente_id) || 0) + saldo)
+          }
         }
       })
 
@@ -90,9 +103,7 @@ export default function ClientesPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <span className="text-text-muted">carregando...</span>
-        </div>
+        <SkeletonTable rows={6} />
       ) : filtered.length > 0 ? (
         <div className="rounded-2xl overflow-hidden">
           <div className="hidden sm:grid grid-cols-5 h-11 px-5 bg-bg-card items-center">
@@ -118,8 +129,20 @@ export default function ClientesPage() {
                 <span className="hidden sm:block text-[13px] text-text-muted truncate">
                   {cliente.endereco || '—'}
                 </span>
-                <span className={`hidden sm:block text-[13px] font-semibold ${cliente.fiado_aberto ? 'text-warning' : 'text-text-muted'}`}>
-                  {cliente.fiado_aberto ? formatCurrency(cliente.fiado_aberto) : '—'}
+                <span className="hidden sm:flex items-center gap-2">
+                  <span className={`text-[13px] font-semibold ${cliente.fiado_aberto ? 'text-warning' : 'text-text-muted'}`}>
+                    {cliente.fiado_aberto ? formatCurrency(cliente.fiado_aberto) : '—'}
+                  </span>
+                  {!!cliente.fiado_aberto && (
+                    <Link
+                      href="/devedores"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-danger/15 text-danger text-[11px] font-semibold hover:bg-danger/25 transition-colors"
+                    >
+                      <AlertCircle className="w-3 h-3" />
+                      ver
+                    </Link>
+                  )}
                 </span>
                 <span className="text-[13px] text-text-muted">
                   {new Date(cliente.created_at).toLocaleDateString('pt-BR')}

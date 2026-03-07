@@ -12,6 +12,7 @@ import { EntradaEstoqueModal } from '@/components/estoque/entrada-estoque-modal'
 import { AjusteEstoqueModal } from '@/components/estoque/ajuste-estoque-modal'
 import { useAuth } from '@/lib/auth-context'
 import { AccessDenied } from '@/components/ui/access-denied'
+import { SkeletonTable } from '@/components/ui/skeleton'
 import type { Produto, EstoqueMovimento } from '@/lib/types'
 
 // Cores e icones por tipo de movimentacao
@@ -156,9 +157,7 @@ export default function EstoquePage() {
 
       {/* Lista de movimentacoes */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <span className="font-mono text-text-muted">carregando...</span>
-        </div>
+        <SkeletonTable rows={5} />
       ) : movimentos.length === 0 ? (
         <EmptyState
           icon={Package}

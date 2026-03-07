@@ -11,6 +11,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { NovaComandaModal } from '@/components/comandas/nova-comanda-modal'
+import { SkeletonTable } from '@/components/ui/skeleton'
 import type { Comanda } from '@/lib/types'
 
 const filtros = ['todos', 'abertos', 'pagos', 'delivery'] as const
@@ -141,9 +142,7 @@ export default function ComandasPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <span className="text-text-muted">carregando...</span>
-        </div>
+        <SkeletonTable rows={5} />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={ClipboardList}

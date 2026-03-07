@@ -9,6 +9,7 @@ import { getProdutosEstoqueBaixo } from '@/lib/supabase-helpers'
 import { ChartBar } from '@/components/ui/chart-bar'
 import { NovaComandaModal } from '@/components/comandas/nova-comanda-modal'
 import { useAuth } from '@/lib/auth-context'
+import { DashboardSkeleton } from '@/components/ui/skeleton'
 import type { Mesa, Comanda, Produto } from '@/lib/types'
 
 export default function DashboardPage() {
@@ -127,11 +128,7 @@ export default function DashboardPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <span className="text-text-muted">carregando...</span>
-      </div>
-    )
+    return <DashboardSkeleton />
   }
 
   return (
@@ -185,7 +182,10 @@ export default function DashboardPage() {
           </span>
         </div>
         {fiadosPendentes > 0 && (
-          <div className="flex flex-col gap-3 p-5 bg-bg-card rounded-2xl border-l-4 border-warning">
+          <div
+            onClick={() => router.push('/devedores')}
+            className="flex flex-col gap-3 p-5 bg-bg-card rounded-2xl border-l-4 border-warning cursor-pointer hover:bg-bg-elevated transition-colors"
+          >
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-warning" />
               <span className="text-xs text-text-muted">A Prazo (pendente)</span>
@@ -193,6 +193,7 @@ export default function DashboardPage() {
             <span className="font-heading text-3xl font-bold text-warning">
               {formatCurrency(fiadosPendentes)}
             </span>
+            <span className="text-[11px] text-orange">ver devedores →</span>
           </div>
         )}
       </div>

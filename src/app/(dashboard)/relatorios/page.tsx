@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Calendar, FileDown, Clock, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import * as Tabs from '@radix-ui/react-tabs'
 import { supabase } from '@/lib/supabase'
@@ -10,6 +11,7 @@ import { useEmpresa } from '@/lib/empresa-context'
 import { useAuth } from '@/lib/auth-context'
 import { AccessDenied } from '@/components/ui/access-denied'
 import { ChartBar } from '@/components/ui/chart-bar'
+import { SkeletonCard } from '@/components/ui/skeleton'
 import type { CaixaTurno } from '@/lib/types'
 
 type Periodo = 'hoje' | 'ontem' | '7dias' | '30dias' | '90dias' | '1ano' | 'tudo' | 'custom'
@@ -373,8 +375,11 @@ export default function RelatoriosPage() {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <span className="text-text-muted">carregando...</span>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
+          </div>
+          <div className="h-64 bg-bg-card rounded-2xl animate-pulse" />
         </div>
       ) : (
         <Tabs.Root value={tab} onValueChange={setTab}>
@@ -423,14 +428,15 @@ export default function RelatoriosPage() {
                 corAtual="text-orange"
                 mostrarAnterior={periodo !== 'tudo'}
               />
-              <div className="flex flex-col gap-3 p-5 bg-bg-card rounded-2xl border-l-4 border-warning">
+              <Link href="/devedores" className="flex flex-col gap-2 p-5 bg-bg-card rounded-2xl border-l-4 border-warning hover:bg-bg-elevated transition-colors">
                 <span className="text-xs text-text-muted flex items-center gap-1.5">
                   <Clock size={12} /> Vendas a Prazo (pendentes)
                 </span>
                 <span className="font-heading text-2xl font-bold text-warning">
                   {formatCurrency(dados.atual.fiadosPendentes)}
                 </span>
-              </div>
+                <span className="text-[11px] text-orange">ver devedores →</span>
+              </Link>
             </div>
 
             {/* Formas de pagamento */}

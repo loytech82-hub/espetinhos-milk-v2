@@ -12,6 +12,7 @@ import { AbrirTurnoModal } from '@/components/caixa/abrir-turno-modal'
 import { FecharTurnoModal } from '@/components/caixa/fechar-turno-modal'
 import { useAuth } from '@/lib/auth-context'
 import { AccessDenied } from '@/components/ui/access-denied'
+import { SkeletonTable } from '@/components/ui/skeleton'
 import type { CaixaMovimento, CaixaTurno } from '@/lib/types'
 
 export default function CaixaPage() {
@@ -154,9 +155,7 @@ export default function CaixaPage() {
       {/* Lista de movimentos */}
       {turno && (
         loading ? (
-          <div className="flex items-center justify-center py-20">
-            <span className="text-text-muted">carregando...</span>
-          </div>
+          <SkeletonTable rows={4} />
         ) : (
           <div className="space-y-4">
             <h2 className="font-heading text-xl font-semibold">Movimentos do Turno</h2>

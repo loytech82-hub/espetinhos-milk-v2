@@ -13,6 +13,7 @@ import { AccessDenied } from '@/components/ui/access-denied'
 import { Button } from '@/components/ui/button'
 import { ProdutoModal } from '@/components/produtos/produto-modal'
 import { EntradaEstoqueModal } from '@/components/estoque/entrada-estoque-modal'
+import { SkeletonTable } from '@/components/ui/skeleton'
 import { AjusteEstoqueModal } from '@/components/estoque/ajuste-estoque-modal'
 import type { Produto } from '@/lib/types'
 
@@ -173,9 +174,7 @@ export default function ProdutosPage() {
 
       {/* Lista de produtos */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <span className="text-text-muted">carregando...</span>
-        </div>
+        <SkeletonTable rows={6} />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={Package}
