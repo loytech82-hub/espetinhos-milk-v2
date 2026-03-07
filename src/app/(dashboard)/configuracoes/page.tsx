@@ -36,6 +36,10 @@ export default function ConfiguracoesPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'perfil' | 'empresa' | 'usuarios' | 'categorias'>('perfil')
 
+  // Emails autorizados a ver a aba Usuarios
+  const emailsGerentes = ['luloimonster@gmail.com', 'milca.mytc@hotmail.com']
+  const podeVerUsuarios = emailsGerentes.includes(user?.email || '')
+
   // Empresa form
   const [empNome, setEmpNome] = useState('')
   const [empEndereco, setEmpEndereco] = useState('')
@@ -316,15 +320,17 @@ export default function ConfiguracoesPage() {
           <Building2 className="w-4 h-4" />
           Empresa
         </button>
-        <button
-          onClick={() => setTab('usuarios')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-            tab === 'usuarios' ? 'bg-orange text-text-dark' : 'bg-bg-card text-text-muted hover:text-text-white'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          Usuarios
-        </button>
+        {podeVerUsuarios && (
+          <button
+            onClick={() => setTab('usuarios')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+              tab === 'usuarios' ? 'bg-orange text-text-dark' : 'bg-bg-card text-text-muted hover:text-text-white'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            Usuarios
+          </button>
+        )}
         <button
           onClick={() => setTab('categorias')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
@@ -501,14 +507,14 @@ export default function ConfiguracoesPage() {
         </form>
       )}
 
-      {/* Tab: Usuarios */}
-      {tab === 'usuarios' && (
+      {/* Tab: Usuarios — somente gerentes */}
+      {tab === 'usuarios' && podeVerUsuarios && (
         <div className="space-y-6">
           {/* Garcons */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="font-heading text-xl font-semibold">
-                Garcons ({usuarios.filter(u => u.role === 'garcom').length})
+                Garcons ({usuarios.filter(u => u.role === 'garcom' && u.ativo).length})
               </h2>
               <Button onClick={() => setGarcomModalOpen(true)} variant="primary" size="sm">
                 <Plus className="w-4 h-4" />
@@ -519,13 +525,13 @@ export default function ConfiguracoesPage() {
               Cada garcom cadastrado aqui aparece na tela de login. O garcom toca no proprio nome para entrar.
             </p>
             <div className="rounded-2xl overflow-hidden space-y-px">
-              {usuarios.filter(u => u.role === 'garcom').length === 0 ? (
+              {usuarios.filter(u => u.role === 'garcom' && u.ativo).length === 0 ? (
                 <div className="px-5 py-8 bg-bg-card text-center">
                   <p className="text-sm text-text-muted">Nenhum garcom cadastrado</p>
                   <p className="text-xs text-text-muted mt-1">Clique em &quot;Novo Garcom&quot; para adicionar</p>
                 </div>
               ) : (
-                usuarios.filter(u => u.role === 'garcom').map(usr => (
+                usuarios.filter(u => u.role === 'garcom' && u.ativo).map(usr => (
                   <div key={usr.id} className="flex items-center justify-between gap-4 px-5 py-4 bg-bg-card">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-orange/15 rounded-full flex items-center justify-center">
@@ -560,10 +566,10 @@ export default function ConfiguracoesPage() {
           {/* Demais usuarios */}
           <div className="space-y-3">
             <h2 className="font-heading text-xl font-semibold">
-              Administradores e Caixa ({usuarios.filter(u => u.role !== 'garcom').length})
+              Administradores e Caixa ({usuarios.filter(u => u.role !== 'garcom' && u.ativo).length})
             </h2>
             <div className="rounded-2xl overflow-hidden space-y-px">
-              {usuarios.filter(u => u.role !== 'garcom').map(usr => {
+              {usuarios.filter(u => u.role !== 'garcom' && u.ativo).map(usr => {
                 const RoleIcon = roleIcons[usr.role] || Shield
                 return (
                   <div key={usr.id} className="flex items-center justify-between gap-4 px-5 py-4 bg-bg-card">

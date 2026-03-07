@@ -32,13 +32,13 @@ const mainItems: NavItem[] = [
   { href: '/', label: 'Inicio', icon: LayoutDashboard },
   { href: '/comandas', label: 'Pedidos', icon: ClipboardList },
   { href: '/mesas', label: 'Mesas', icon: UtensilsCrossed },
+  { href: '/clientes', label: 'Clientes', icon: Users },
   { href: '/caixa', label: 'Caixa', icon: DollarSign, roles: ['admin', 'caixa'] },
-  { href: '/devedores', label: 'Devedores', icon: AlertCircle, roles: ['admin', 'caixa'] },
 ]
 
 const moreItems: NavItem[] = [
+  { href: '/devedores', label: 'Devedores', icon: AlertCircle, roles: ['admin', 'caixa'] },
   { href: '/produtos', label: 'Produtos', icon: Package, roles: ['admin'] },
-  { href: '/clientes', label: 'Clientes', icon: Users },
   { href: '/relatorios', label: 'Relatorios', icon: BarChart3, roles: ['admin'] },
   { href: '/configuracoes', label: 'Configuracoes', icon: Settings, roles: ['admin'] },
 ]

@@ -6,7 +6,9 @@ import { Search, AlertCircle, Phone, ChevronDown, ChevronUp, Plus, Banknote, Arr
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { EmptyState } from '@/components/ui/empty-state'
+import { AccessDenied } from '@/components/ui/access-denied'
 import { SkeletonCard, SkeletonTable } from '@/components/ui/skeleton'
+import { useAuth } from '@/lib/auth-context'
 import { ReceberPagamentoModal } from '@/components/devedores/receber-pagamento-modal'
 import { AddProdutoFiadoModal } from '@/components/devedores/add-produto-fiado-modal'
 import type { Comanda, ComandaItem } from '@/lib/types'
@@ -21,10 +23,13 @@ interface ClienteDevedor {
 
 export default function DevedoresPage() {
   const router = useRouter()
+  const { role } = useAuth()
   const [devedores, setDevedores] = useState<ClienteDevedor[]>([])
   const [busca, setBusca] = useState('')
   const [loading, setLoading] = useState(true)
   const [expandido, setExpandido] = useState<string | null>(null)
+
+  if (role === 'garcom') return <AccessDenied message="Garcons nao tem acesso aos devedores" />
 
   // Modais
   const [pgtoModal, setPgtoModal] = useState<{ open: boolean; comanda: Comanda | null; clienteId: string; clienteNome: string }>({
