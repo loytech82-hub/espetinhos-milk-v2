@@ -27,7 +27,27 @@ export interface Comanda {
   fiado_pago: boolean
   fiado_pago_em: string | null
   fiado_prazo_dias: number | null
+  fiado_valor_pago: number
   empresa_id: number
+}
+
+export interface FiadoPagamento {
+  id: string
+  comanda_id: string
+  cliente_id: string
+  valor: number
+  forma_pagamento: string
+  observacao: string | null
+  empresa_id: number
+  created_at: string
+}
+
+export interface ClienteDevedor {
+  id: string
+  nome: string
+  telefone: string | null
+  total_divida: number
+  comandas_pendentes: number
 }
 
 export interface ComandaItem {

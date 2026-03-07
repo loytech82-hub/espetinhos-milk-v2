@@ -16,30 +16,32 @@ function getGarcomPassword(empresaId: number): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}))
-    const codigoEmpresa = body.codigoEmpresa as string | undefined
+    const empresaId = body.empresaId as number | undefined
 
-    if (!codigoEmpresa?.trim()) {
-      return NextResponse.json({ error: 'Informe o codigo da empresa' }, { status: 400 })
+    if (!empresaId) {
+      return NextResponse.json({ error: 'Selecione a empresa' }, { status: 400 })
     }
 
-    // Buscar empresa pelo codigo de acesso
+    // Verificar se empresa existe
     const { data: empresa, error: empError } = await supabaseAdmin
       .from('empresa')
       .select('id')
-      .eq('codigo_acesso', codigoEmpresa.trim().toUpperCase())
+      .eq('id', empresaId)
       .single()
 
     if (empError || !empresa) {
-      return NextResponse.json({ error: 'Codigo de empresa invalido' }, { status: 404 })
+      return NextResponse.json({ error: 'Empresa nao encontrada' }, { status: 404 })
     }
-
-    const empresaId = empresa.id
     const email = getGarcomEmail(empresaId)
     const senha = getGarcomPassword(empresaId)
 
-    // Verificar se a conta garcom desta empresa ja existe
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
-    const garcomUser = existingUsers?.users?.find(u => u.email === email)
+    // Verificar se a conta garcom desta empresa ja existe (via profile, mais eficiente)
+    const { data: existingProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .single()
+    const garcomUser = existingProfile
 
     if (garcomUser) {
       // Conta existe — retornar credenciais para login no client
@@ -61,7 +63,12 @@ export async function POST(request: NextRequest) {
 
     // Garantir profile com role='garcom' e empresa_id
     if (newUser?.user) {
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Aguardar trigger criar profile (retry ate 3x)
+      for (let i = 0; i < 3; i++) {
+        const { data } = await supabaseAdmin.from('profiles').select('id').eq('id', newUser.user.id).single()
+        if (data) break
+        await new Promise(r => setTimeout(r, 200))
+      }
 
       await supabaseAdmin.from('profiles').upsert({
         id: newUser.user.id,

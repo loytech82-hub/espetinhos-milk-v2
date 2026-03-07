@@ -50,6 +50,10 @@ export async function POST(request: NextRequest) {
         return await handleReceberFiado(params, empresaId)
       case 'registrarMovimentoEstoque':
         return await handleRegistrarMovimentoEstoque(params, empresaId)
+      case 'receberFiadoParcial':
+        return await handleReceberFiadoParcial(params, empresaId)
+      case 'addItemToClienteDebt':
+        return await handleAddItemToClienteDebt(params, empresaId)
       default:
         return NextResponse.json({ error: `Acao desconhecida: ${action}` }, { status: 400 })
     }
@@ -695,6 +699,208 @@ async function handleUpdateItemQuantidade(params: {
   await recalcularTotal(comandaId)
 
   return NextResponse.json({ result: true })
+}
+
+// ============================================
+// HELPERS INTERNOS
+// ============================================
+
+// ============================================
+// FIADO - PAGAMENTO PARCIAL
+// ============================================
+
+async function handleReceberFiadoParcial(params: {
+  comandaId: string
+  valor: number
+  formaPagamento: string
+  clienteId: string
+}, empresaId: number) {
+  const { comandaId, valor, formaPagamento, clienteId } = params
+
+  if (valor <= 0) {
+    return NextResponse.json({ error: 'Valor deve ser maior que zero' }, { status: 400 })
+  }
+
+  // Buscar comanda
+  const { data: comanda, error: fetchErr } = await supabaseAdmin
+    .from('comandas')
+    .select('*')
+    .eq('id', comandaId)
+    .eq('empresa_id', empresaId)
+    .single()
+
+  if (fetchErr || !comanda) {
+    return NextResponse.json({ error: 'Comanda nao encontrada' }, { status: 404 })
+  }
+
+  if (!comanda.fiado || comanda.fiado_pago) {
+    return NextResponse.json({ error: 'Esta comanda nao tem pagamento pendente' }, { status: 400 })
+  }
+
+  const saldoRestante = comanda.total - (comanda.fiado_valor_pago || 0)
+  if (valor > saldoRestante + 0.01) {
+    return NextResponse.json({ error: `Valor excede o saldo devedor (${saldoRestante.toFixed(2)})` }, { status: 400 })
+  }
+
+  // Registrar pagamento
+  await supabaseAdmin.from('fiado_pagamentos').insert({
+    comanda_id: comandaId,
+    cliente_id: clienteId,
+    valor,
+    forma_pagamento: formaPagamento,
+    empresa_id: empresaId,
+  })
+
+  // Atualizar valor pago na comanda
+  const novoValorPago = (comanda.fiado_valor_pago || 0) + valor
+  const quitado = novoValorPago >= comanda.total - 0.01
+
+  await supabaseAdmin
+    .from('comandas')
+    .update({
+      fiado_valor_pago: novoValorPago,
+      ...(quitado ? { fiado_pago: true, fiado_pago_em: new Date().toISOString() } : {}),
+    })
+    .eq('id', comandaId)
+    .eq('empresa_id', empresaId)
+
+  // Registrar entrada no caixa
+  const { data: turno } = await supabaseAdmin
+    .from('caixa_turnos')
+    .select('id')
+    .eq('status', 'aberto')
+    .eq('empresa_id', empresaId)
+    .order('aberto_em', { ascending: false })
+    .limit(1)
+    .single()
+
+  await supabaseAdmin.from('caixa').insert({
+    tipo: 'entrada',
+    valor,
+    descricao: `Pgto fiado - Comanda #${comanda.numero}${quitado ? ' (quitado)' : ' (parcial)'}`,
+    forma_pagamento: formaPagamento,
+    comanda_id: comandaId,
+    turno_id: turno?.id || null,
+    empresa_id: empresaId,
+  })
+
+  return NextResponse.json({ result: { quitado } })
+}
+
+// ============================================
+// FIADO - ADICIONAR PRODUTOS A DIVIDA DO CLIENTE
+// ============================================
+
+async function handleAddItemToClienteDebt(params: {
+  clienteId: string
+  clienteNome: string
+  itens: { produtoId: string; quantidade: number; observacao?: string }[]
+}, empresaId: number) {
+  const { clienteId, clienteNome, itens } = params
+
+  if (!itens || itens.length === 0) {
+    return NextResponse.json({ error: 'Adicione pelo menos um item' }, { status: 400 })
+  }
+
+  // Proximo numero de comanda
+  const { data: lastComanda } = await supabaseAdmin
+    .from('comandas')
+    .select('numero')
+    .eq('empresa_id', empresaId)
+    .order('numero', { ascending: false })
+    .limit(1)
+  const numero = (lastComanda?.[0]?.numero || 0) + 1
+
+  // Calcular total e validar produtos
+  let total = 0
+  const itensProcessados = []
+
+  for (const item of itens) {
+    const { data: produto } = await supabaseAdmin
+      .from('produtos')
+      .select('*')
+      .eq('id', item.produtoId)
+      .eq('empresa_id', empresaId)
+      .single()
+
+    if (!produto) {
+      return NextResponse.json({ error: `Produto nao encontrado` }, { status: 404 })
+    }
+
+    // Validar estoque
+    if (produto.controlar_estoque && (produto.estoque_atual || 0) < item.quantidade) {
+      return NextResponse.json(
+        { error: `Estoque insuficiente de ${produto.nome} (disponivel: ${produto.estoque_atual || 0})` },
+        { status: 400 }
+      )
+    }
+
+    const subtotal = produto.preco * item.quantidade
+    total += subtotal
+    itensProcessados.push({ ...item, produto, subtotal, precoUnitario: produto.preco })
+  }
+
+  // Criar comanda fechada como fiado
+  const { data: comanda, error: cmdErr } = await supabaseAdmin
+    .from('comandas')
+    .insert({
+      numero,
+      tipo: 'balcao',
+      status: 'fechada',
+      total,
+      desconto: 0,
+      taxa_servico: 0,
+      forma_pagamento: 'fiado',
+      cliente_id: clienteId,
+      cliente_nome: clienteNome,
+      fiado: true,
+      fiado_pago: false,
+      fiado_valor_pago: 0,
+      aberta_em: new Date().toISOString(),
+      fechada_em: new Date().toISOString(),
+      empresa_id: empresaId,
+    })
+    .select()
+    .single()
+
+  if (cmdErr || !comanda) {
+    return NextResponse.json({ error: 'Erro ao criar comanda' }, { status: 500 })
+  }
+
+  // Inserir itens e decrementar estoque
+  for (const item of itensProcessados) {
+    await supabaseAdmin.from('comanda_itens').insert({
+      comanda_id: comanda.id,
+      produto_id: item.produtoId,
+      quantidade: item.quantidade,
+      preco_unitario: item.precoUnitario,
+      subtotal: item.subtotal,
+      observacao: item.observacao || null,
+      empresa_id: empresaId,
+    })
+
+    if (item.produto.controlar_estoque) {
+      const novoEstoque = (item.produto.estoque_atual || 0) - item.quantidade
+      await supabaseAdmin
+        .from('produtos')
+        .update({ estoque_atual: novoEstoque })
+        .eq('id', item.produtoId)
+        .eq('empresa_id', empresaId)
+
+      await supabaseAdmin.from('estoque_movimentos').insert({
+        produto_id: item.produtoId,
+        tipo: 'venda',
+        quantidade: item.quantidade,
+        estoque_anterior: item.produto.estoque_atual || 0,
+        estoque_posterior: novoEstoque,
+        motivo: `Fiado - Comanda #${numero}`,
+        comanda_id: comanda.id,
+        empresa_id: empresaId,
+      })
+    }
+  }
+
+  return NextResponse.json({ result: comanda })
 }
 
 // ============================================

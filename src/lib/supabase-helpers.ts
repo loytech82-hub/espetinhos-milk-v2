@@ -101,6 +101,25 @@ export async function receberFiado(
   await apiCall('receberFiado', { comandaId, formaPagamentoRecebimento })
 }
 
+// Receber pagamento parcial de fiado (via API)
+export async function receberFiadoParcial(
+  comandaId: string,
+  valor: number,
+  formaPagamento: string,
+  clienteId: string
+): Promise<{ quitado: boolean }> {
+  return apiCall<{ quitado: boolean }>('receberFiadoParcial', { comandaId, valor, formaPagamento, clienteId })
+}
+
+// Adicionar produtos a divida do cliente (via API)
+export async function addItemToClienteDebt(
+  clienteId: string,
+  clienteNome: string,
+  itens: { produtoId: string; quantidade: number; observacao?: string }[]
+): Promise<void> {
+  await apiCall('addItemToClienteDebt', { clienteId, clienteNome, itens })
+}
+
 // Cancelar comanda (via API dedicada)
 export async function cancelComanda(comandaId: string): Promise<void> {
   const res = await fetch(`/api/comandas/${comandaId}`, { method: 'PATCH' })
@@ -325,7 +344,7 @@ export async function getEmpresa(): Promise<Empresa | null> {
   const { data } = await supabase
     .from('empresa')
     .select('*')
-    .eq('id', 1)
+    .limit(1)
     .single()
 
   return data as Empresa | null

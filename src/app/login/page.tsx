@@ -13,7 +13,9 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [codigoEmpresa, setCodigoEmpresa] = useState('')
+  const [empresas, setEmpresas] = useState<{ id: number; nome: string }[]>([])
+  const [empresaId, setEmpresaId] = useState<number | null>(null)
+  const [loadingEmpresas, setLoadingEmpresas] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -92,10 +94,25 @@ export default function LoginPage() {
     }
   }
 
-  // Login garcom — conta compartilhada via API com codigo da empresa
+  // Carregar empresas quando aba garcom ativa
+  async function loadEmpresas() {
+    if (empresas.length > 0) return
+    setLoadingEmpresas(true)
+    try {
+      const res = await fetch('/api/auth/empresas')
+      const data = await res.json()
+      if (Array.isArray(data)) setEmpresas(data)
+    } catch {
+      // ignore
+    } finally {
+      setLoadingEmpresas(false)
+    }
+  }
+
+  // Login garcom — conta compartilhada via API com empresa selecionada
   async function handleGarcomLogin(e: React.FormEvent) {
     e.preventDefault()
-    if (!codigoEmpresa.trim()) { setError('Informe o codigo da empresa'); return }
+    if (!empresaId) { setError('Selecione a empresa'); return }
 
     setLoading(true)
     setError('')
@@ -104,7 +121,7 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/garcom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ codigoEmpresa: codigoEmpresa.trim().toUpperCase() }),
+        body: JSON.stringify({ empresaId }),
       })
       const data = await res.json()
 
@@ -138,6 +155,7 @@ export default function LoginPage() {
     setMode('login')
     setError('')
     setSuccess('')
+    if (newTab === 'garcom') loadEmpresas()
   }
 
   return (
@@ -320,7 +338,7 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* Tab: Garcom — codigo da empresa */}
+        {/* Tab: Garcom — selecionar empresa */}
         {tab === 'garcom' && (
           <form onSubmit={handleGarcomLogin} className="space-y-6">
             <div className="text-center space-y-3 py-4">
@@ -331,26 +349,34 @@ export default function LoginPage() {
                 Acesso rapido para garcons e atendentes
               </p>
               <p className="font-mono text-[11px] text-[#555]">
-                Peca o codigo ao administrador
+                Selecione sua empresa para entrar
               </p>
             </div>
 
             <div className="space-y-2">
-              <label className="font-mono text-xs text-[#777]">codigo da empresa</label>
-              <input
-                type="text"
-                value={codigoEmpresa}
-                onChange={(e) => setCodigoEmpresa(e.target.value.toUpperCase().slice(0, 6))}
-                placeholder="EX: A1B2C3"
-                maxLength={6}
-                className="w-full h-11 px-4 bg-[#2D2D2D] rounded-2xl font-mono text-sm text-white placeholder:text-[#777] outline-none focus:ring-2 focus:ring-[#FF6B35] transition-all text-center tracking-[0.3em] uppercase"
-                required
-              />
+              <label className="font-mono text-xs text-[#777]">empresa</label>
+              {loadingEmpresas ? (
+                <div className="w-full h-11 bg-[#2D2D2D] rounded-2xl flex items-center justify-center">
+                  <span className="font-mono text-xs text-[#777]">carregando...</span>
+                </div>
+              ) : (
+                <select
+                  value={empresaId ?? ''}
+                  onChange={(e) => setEmpresaId(e.target.value ? Number(e.target.value) : null)}
+                  className="w-full h-11 px-4 bg-[#2D2D2D] rounded-2xl font-mono text-sm text-white outline-none focus:ring-2 focus:ring-[#FF6B35] transition-all cursor-pointer appearance-none"
+                  required
+                >
+                  <option value="" className="text-[#777]">Selecione a empresa...</option>
+                  {empresas.map(emp => (
+                    <option key={emp.id} value={emp.id}>{emp.nome}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <button
               type="submit"
-              disabled={loading || codigoEmpresa.trim().length < 3}
+              disabled={loading || !empresaId}
               className="w-full h-14 bg-[#FF6B35] hover:bg-[#E85A24] rounded-2xl font-mono text-base font-bold text-[#0D0D0D] flex items-center justify-center gap-3 transition-colors disabled:opacity-50 cursor-pointer"
             >
               <Users className="w-5 h-5" />

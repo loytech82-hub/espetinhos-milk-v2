@@ -15,6 +15,7 @@ import {
   Settings,
   LogOut,
   X,
+  AlertCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
@@ -32,6 +33,7 @@ const mainItems: NavItem[] = [
   { href: '/comandas', label: 'Pedidos', icon: ClipboardList },
   { href: '/mesas', label: 'Mesas', icon: UtensilsCrossed },
   { href: '/caixa', label: 'Caixa', icon: DollarSign, roles: ['admin', 'caixa'] },
+  { href: '/devedores', label: 'Devedores', icon: AlertCircle, roles: ['admin', 'caixa'] },
 ]
 
 const moreItems: NavItem[] = [

@@ -70,7 +70,12 @@ export async function POST(request: Request) {
 
     // 3. Garantir profile com role='admin' e empresa_id via upsert
     if (newUser?.user) {
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Aguardar trigger criar profile (retry ate 3x)
+      for (let i = 0; i < 3; i++) {
+        const { data } = await supabaseAdmin.from('profiles').select('id').eq('id', newUser.user.id).single()
+        if (data) break
+        await new Promise(r => setTimeout(r, 200))
+      }
 
       const { error: profileError } = await supabaseAdmin
         .from('profiles')

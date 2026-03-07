@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Settings, Users, Tag, Plus, Shield, ShieldCheck, ShieldAlert, Building2, Save, User, Mail, Lock, Pencil, Copy, Check } from 'lucide-react'
+import { Settings, Users, Tag, Plus, Shield, ShieldCheck, ShieldAlert, Building2, Save, User, Mail, Lock, Pencil } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { updateEmpresa } from '@/lib/supabase-helpers'
 import { Button } from '@/components/ui/button'
@@ -35,9 +35,6 @@ export default function ConfiguracoesPage() {
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'perfil' | 'empresa' | 'usuarios' | 'categorias'>('perfil')
-
-  // Copiar codigo
-  const [copiado, setCopiado] = useState(false)
 
   // Empresa form
   const [empNome, setEmpNome] = useState('')
@@ -459,35 +456,13 @@ export default function ConfiguracoesPage() {
             </div>
           </div>
 
-          {/* Codigo de Acesso para Garcons */}
-          {empresa?.codigo_acesso && (
-            <div className="p-5 bg-bg-card rounded-2xl space-y-3 max-w-lg">
-              <h3 className="font-heading text-sm font-semibold text-text-muted">CODIGO DE ACESSO (GARCONS)</h3>
-              <p className="text-xs text-text-muted">
-                Compartilhe este codigo com seus garcons para que eles acessem o sistema.
-              </p>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-12 bg-bg-elevated rounded-xl flex items-center justify-center">
-                  <span className="font-mono text-2xl font-bold text-[#FF6B35] tracking-[0.4em]">
-                    {empresa.codigo_acesso}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(empresa.codigo_acesso!)
-                    setCopiado(true)
-                    toast('Codigo copiado!', 'success')
-                    setTimeout(() => setCopiado(false), 2000)
-                  }}
-                  className="h-12 px-4 bg-bg-elevated hover:bg-[#333] rounded-xl flex items-center gap-2 font-mono text-xs text-text-muted hover:text-text-white transition-colors cursor-pointer"
-                >
-                  {copiado ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
-                  {copiado ? 'Copiado!' : 'Copiar'}
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Info Garcons */}
+          <div className="p-5 bg-bg-card rounded-2xl space-y-3 max-w-lg">
+            <h3 className="font-heading text-sm font-semibold text-text-muted">ACESSO GARCONS</h3>
+            <p className="text-xs text-text-muted">
+              Garcons podem acessar o sistema selecionando sua empresa na tela de login. Nao e necessario codigo de acesso.
+            </p>
+          </div>
         </form>
       )}
 
