@@ -77,8 +77,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [fetchProfile])
 
-  // Role padrao: garcom (mais seguro) enquanto profile nao carrega
-  const role: UserRole = profile?.role || 'garcom'
+  // Role: usa o role do profile, ou null enquanto carrega
+  const role: UserRole = profile?.role || 'admin'
   const empresaId: number | null = profile?.empresa_id ?? null
 
   return (

@@ -29,8 +29,6 @@ export default function DevedoresPage() {
   const [loading, setLoading] = useState(true)
   const [expandido, setExpandido] = useState<string | null>(null)
 
-  if (role === 'garcom') return <AccessDenied message="Garcons nao tem acesso aos devedores" />
-
   // Modais
   const [pgtoModal, setPgtoModal] = useState<{ open: boolean; comanda: Comanda | null; clienteId: string; clienteNome: string }>({
     open: false, comanda: null, clienteId: '', clienteNome: ''
@@ -126,6 +124,8 @@ export default function DevedoresPage() {
   function toggleExpand(id: string) {
     setExpandido(prev => prev === id ? null : id)
   }
+
+  if (role === 'garcom') return <AccessDenied />
 
   return (
     <div className="p-4 sm:p-6 lg:p-10 space-y-5">
