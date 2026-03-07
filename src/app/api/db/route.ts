@@ -737,7 +737,16 @@ async function handleReceberFiadoParcial(params: {
     return NextResponse.json({ error: 'Esta comanda nao tem pagamento pendente' }, { status: 400 })
   }
 
-  const saldoRestante = comanda.total - (comanda.fiado_valor_pago || 0)
+  // Calcular valor ja pago a partir de fiado_pagamentos
+  const { data: pagamentos } = await supabaseAdmin
+    .from('fiado_pagamentos')
+    .select('valor')
+    .eq('comanda_id', comandaId)
+    .eq('empresa_id', empresaId)
+
+  const totalJaPago = (pagamentos || []).reduce((acc, p) => acc + Number(p.valor), 0)
+  const saldoRestante = comanda.total - totalJaPago
+
   if (valor > saldoRestante + 0.01) {
     return NextResponse.json({ error: `Valor excede o saldo devedor (${saldoRestante.toFixed(2)})` }, { status: 400 })
   }
@@ -751,18 +760,20 @@ async function handleReceberFiadoParcial(params: {
     empresa_id: empresaId,
   })
 
-  // Atualizar valor pago na comanda
-  const novoValorPago = (comanda.fiado_valor_pago || 0) + valor
-  const quitado = novoValorPago >= comanda.total - 0.01
+  // Verificar se quitou
+  const novoTotalPago = totalJaPago + valor
+  const quitado = novoTotalPago >= comanda.total - 0.01
 
-  await supabaseAdmin
-    .from('comandas')
-    .update({
-      fiado_valor_pago: novoValorPago,
-      ...(quitado ? { fiado_pago: true, fiado_pago_em: new Date().toISOString() } : {}),
-    })
-    .eq('id', comandaId)
-    .eq('empresa_id', empresaId)
+  if (quitado) {
+    await supabaseAdmin
+      .from('comandas')
+      .update({
+        fiado_pago: true,
+        fiado_pago_em: new Date().toISOString(),
+      })
+      .eq('id', comandaId)
+      .eq('empresa_id', empresaId)
+  }
 
   // Registrar entrada no caixa
   const { data: turno } = await supabaseAdmin
@@ -855,7 +866,6 @@ async function handleAddItemToClienteDebt(params: {
       cliente_nome: clienteNome,
       fiado: true,
       fiado_pago: false,
-      fiado_valor_pago: 0,
       aberta_em: new Date().toISOString(),
       fechada_em: new Date().toISOString(),
       empresa_id: empresaId,

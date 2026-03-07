@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
+import { supabase } from '@/lib/supabase'
 import { useToast } from '@/lib/toast-context'
 import { formatCurrency } from '@/lib/utils'
 import { receberFiadoParcial } from '@/lib/supabase-helpers'
@@ -30,15 +31,24 @@ export function ReceberPagamentoModal({ open, onOpenChange, comanda, clienteId, 
   const [forma, setForma] = useState('pix')
   const [valor, setValor] = useState('')
   const [loading, setLoading] = useState(false)
-
-  const saldoDevedor = comanda ? comanda.total - (comanda.fiado_valor_pago || 0) : 0
+  const [saldoDevedor, setSaldoDevedor] = useState(0)
 
   useEffect(() => {
     if (open && comanda) {
       setForma('pix')
-      setValor(saldoDevedor.toFixed(2))
+      // Calcular saldo devedor a partir de fiado_pagamentos
+      supabase
+        .from('fiado_pagamentos')
+        .select('valor')
+        .eq('comanda_id', comanda.id)
+        .then(({ data }) => {
+          const totalPago = (data || []).reduce((acc, p) => acc + Number(p.valor), 0)
+          const saldo = comanda.total - totalPago
+          setSaldoDevedor(saldo)
+          setValor(saldo.toFixed(2))
+        })
     }
-  }, [open, comanda, saldoDevedor])
+  }, [open, comanda])
 
   async function handleReceber() {
     if (!comanda) return
@@ -81,10 +91,10 @@ export function ReceberPagamentoModal({ open, onOpenChange, comanda, clienteId, 
               <span className="text-xs text-text-muted">Comanda #{comanda.numero}</span>
               <span className="text-xs text-text-muted">Total: {formatCurrency(comanda.total)}</span>
             </div>
-            {(comanda.fiado_valor_pago || 0) > 0 && (
+            {comanda.total - saldoDevedor > 0.01 && (
               <div className="flex justify-between items-center mb-2">
                 <span className="text-xs text-success">Ja pago</span>
-                <span className="text-xs text-success">{formatCurrency(comanda.fiado_valor_pago || 0)}</span>
+                <span className="text-xs text-success">{formatCurrency(comanda.total - saldoDevedor)}</span>
               </div>
             )}
             <div className="flex justify-between items-center">

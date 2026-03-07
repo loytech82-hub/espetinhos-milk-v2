@@ -27,7 +27,6 @@ export interface Comanda {
   fiado_pago: boolean
   fiado_pago_em: string | null
   fiado_prazo_dias: number | null
-  fiado_valor_pago: number
   empresa_id: number
 }
 

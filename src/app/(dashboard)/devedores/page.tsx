@@ -38,19 +38,30 @@ export default function DevedoresPage() {
   async function loadDevedores() {
     try {
       // Buscar todas as comandas fiado nao pagas com itens
-      const { data: comandasData } = await supabase
-        .from('comandas')
-        .select('*, itens:comanda_itens(*, produto:produtos(nome, preco))')
-        .eq('fiado', true)
-        .eq('fiado_pago', false)
-        .not('cliente_id', 'is', null)
-        .order('fechada_em', { ascending: false })
+      const [{ data: comandasData }, { data: pagamentosData }] = await Promise.all([
+        supabase
+          .from('comandas')
+          .select('*, itens:comanda_itens(*, produto:produtos(nome, preco))')
+          .eq('fiado', true)
+          .eq('fiado_pago', false)
+          .not('cliente_id', 'is', null)
+          .order('fechada_em', { ascending: false }),
+        supabase
+          .from('fiado_pagamentos')
+          .select('comanda_id, valor'),
+      ])
 
       if (!comandasData) {
         setDevedores([])
         setLoading(false)
         return
       }
+
+      // Calcular total pago por comanda
+      const pagoPorComanda = new Map<string, number>()
+      ;(pagamentosData || []).forEach(p => {
+        pagoPorComanda.set(p.comanda_id, (pagoPorComanda.get(p.comanda_id) || 0) + Number(p.valor))
+      })
 
       // Buscar clientes
       const clienteIds = [...new Set(comandasData.map(c => c.cliente_id).filter(Boolean))]
@@ -68,8 +79,12 @@ export default function DevedoresPage() {
         const cliente = clientesMap.get(clienteId)
         if (!cliente) continue
 
-        const saldoDevedor = comanda.total - (comanda.fiado_valor_pago || 0)
+        const valorPago = pagoPorComanda.get(comanda.id) || 0
+        const saldoDevedor = comanda.total - valorPago
         if (saldoDevedor <= 0.01) continue
+
+        // Anotar valor pago na comanda para uso no UI
+        ;(comanda as unknown as Record<string, unknown>)._valor_pago = valorPago
 
         if (!devedoresMap.has(clienteId)) {
           devedoresMap.set(clienteId, {
@@ -209,7 +224,8 @@ export default function DevedoresPage() {
                     {/* Lista de comandas */}
                     <div className="space-y-2">
                       {devedor.comandas.map(comanda => {
-                        const saldo = comanda.total - (comanda.fiado_valor_pago || 0)
+                        const valorPago = ((comanda as unknown as Record<string, unknown>)._valor_pago as number) || 0
+                        const saldo = comanda.total - valorPago
                         return (
                           <div key={comanda.id} className="p-4 bg-bg-elevated rounded-xl space-y-3">
                             <div className="flex items-center justify-between">
@@ -223,9 +239,9 @@ export default function DevedoresPage() {
                               </div>
                               <div className="text-right">
                                 <p className="font-heading text-sm font-bold text-danger">{formatCurrency(saldo)}</p>
-                                {(comanda.fiado_valor_pago || 0) > 0 && (
+                                {valorPago > 0 && (
                                   <p className="text-[11px] text-success">
-                                    Pago: {formatCurrency(comanda.fiado_valor_pago || 0)} de {formatCurrency(comanda.total)}
+                                    Pago: {formatCurrency(valorPago)} de {formatCurrency(comanda.total)}
                                   </p>
                                 )}
                               </div>
