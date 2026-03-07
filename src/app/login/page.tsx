@@ -100,14 +100,20 @@ export default function LoginPage() {
     }
   }
 
-  // Carregar empresas
+  // Carregar empresas (apenas as que tem garcons ativos)
   async function loadEmpresas() {
     if (empresas.length > 0) return
     setLoadingEmpresas(true)
     try {
       const res = await fetch('/api/auth/empresas')
       const data = await res.json()
-      if (Array.isArray(data)) setEmpresas(data)
+      if (Array.isArray(data)) {
+        setEmpresas(data)
+        // Se so tem uma empresa, pula direto para lista de garcons
+        if (data.length === 1) {
+          handleSelectEmpresa(data[0].id)
+        }
+      }
     } catch {
       // ignore
     } finally {
