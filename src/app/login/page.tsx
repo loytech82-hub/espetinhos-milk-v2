@@ -13,7 +13,7 @@ interface GarcomItem {
 export default function LoginPage() {
   const router = useRouter()
   const [tab, setTab] = useState<'admin' | 'garcom'>('admin')
-  const [mode, setMode] = useState<'login' | 'cadastro'>('login')
+  const [mode, setMode] = useState<'login' | 'cadastro' | 'esqueci'>('login')
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
@@ -50,6 +50,28 @@ export default function LoginPage() {
 
       router.push('/')
       router.refresh()
+    } catch {
+      setError('Erro ao conectar. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Recuperar senha
+  async function handleEsqueciSenha(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email.trim()) { setError('Informe o email cadastrado'); return }
+    setLoading(true)
+    setError('')
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/redefinir-senha`,
+      })
+      if (resetError) {
+        setError('Erro ao enviar email. Verifique o endereco e tente novamente.')
+        return
+      }
+      setSuccess(`Link enviado para ${email}! Verifique sua caixa de entrada.`)
     } catch {
       setError('Erro ao conectar. Tente novamente.')
     } finally {
@@ -299,13 +321,22 @@ export default function LoginPage() {
               {loading ? 'entrando...' : 'Entrar'}
             </button>
 
-            <button
-              type="button"
-              onClick={() => { setMode('cadastro'); setError(''); setSuccess('') }}
-              className="w-full text-center font-mono text-xs text-[#777] hover:text-[#FF6B35] transition-colors cursor-pointer"
-            >
-              Ainda nao tem conta? <span className="text-[#FF6B35] font-semibold">Cadastre-se</span>
-            </button>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => { setMode('esqueci'); setError(''); setSuccess('') }}
+                className="w-full text-center font-mono text-xs text-[#777] hover:text-[#FF6B35] transition-colors cursor-pointer"
+              >
+                Esqueci minha senha
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMode('cadastro'); setError(''); setSuccess('') }}
+                className="w-full text-center font-mono text-xs text-[#777] hover:text-[#FF6B35] transition-colors cursor-pointer"
+              >
+                Ainda nao tem conta? <span className="text-[#FF6B35] font-semibold">Cadastre-se</span>
+              </button>
+            </div>
           </form>
         )}
 
@@ -379,6 +410,58 @@ export default function LoginPage() {
             <p className="font-mono text-[11px] text-[#555] text-center">
               A conta sera criada com acesso total ao sistema.
             </p>
+          </form>
+        )}
+
+        {/* Tab: Admin — Esqueci a senha */}
+        {tab === 'admin' && mode === 'esqueci' && (
+          <form onSubmit={handleEsqueciSenha} className="space-y-5">
+            <button
+              type="button"
+              onClick={() => { setMode('login'); setError(''); setSuccess('') }}
+              className="flex items-center gap-1 font-mono text-xs text-[#777] hover:text-white transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-3 h-3" />
+              Voltar ao login
+            </button>
+
+            <div className="text-center space-y-1 py-2">
+              <p className="font-mono text-sm text-white font-semibold">Redefinir Senha</p>
+              <p className="font-mono text-xs text-[#777]">
+                Informe seu email. Vamos enviar um link para redefinir sua senha.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="font-mono text-xs text-[#777]">email cadastrado</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                className="w-full h-11 px-4 bg-[#2D2D2D] rounded-2xl font-mono text-sm text-white placeholder:text-[#777] outline-none focus:ring-2 focus:ring-[#FF6B35] transition-all"
+                required
+                autoFocus
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || !!success}
+              className="w-full h-11 bg-[#FF6B35] hover:bg-[#E85A24] rounded-2xl font-mono text-sm font-semibold text-[#0D0D0D] flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              {loading ? 'enviando...' : success ? 'Email enviado!' : 'Enviar link de redefinicao'}
+            </button>
+
+            {success && (
+              <button
+                type="button"
+                onClick={() => { setMode('login'); setError(''); setSuccess('') }}
+                className="w-full text-center font-mono text-xs text-[#FF6B35] hover:underline cursor-pointer"
+              >
+                Voltar para o login
+              </button>
+            )}
           </form>
         )}
 
